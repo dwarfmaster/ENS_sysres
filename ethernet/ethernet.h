@@ -14,13 +14,14 @@ struct mac_address {
     uint8_t bytes[6];
 };
 
+/* Fields with a comment are required by make_frame */
 struct eth_frame {
-    struct mac_address src, dst;
+    struct mac_address src, dst; /* */
+    uint16_t ethertype; /* */
+    uint16_t size; /* */
     uint32_t tag;
-    uint16_t ethertype;
-    uint16_t size;
-    char* data;
-    uint32_t crc;
+    uint32_t crc; /* */
+    char* data; /* */
 };
 
 ethernet_error_t read_mac_address(const char* src, struct mac_address* dst);

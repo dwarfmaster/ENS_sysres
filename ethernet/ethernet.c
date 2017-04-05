@@ -38,6 +38,7 @@ ethernet_error_t read_mac_address(const char* src, struct mac_address* dst) {
     return ETH_SUCCESS;
 }
 
+/* Returns an error if the size of the message is too big/too small. */
 ethernet_error_t compute_crc(struct eth_frame* frame) {
     /* TODO */
 }
@@ -46,8 +47,36 @@ ethernet_error_t check_crc(struct eth_frame* frame) {
     /* TODO */
 }
 
+/*****************************************************************
+ ******************** Frame Handling *****************************
+ *****************************************************************/
+
+struct ethII_header {
+    uint8_t bytes[12];
+    uint16_t ethertype;
+} __attribute__((__packed__));
+
+struct ethII_header_tagged {
+    uint8_t bytes[12];
+    uint32_t tag;
+    uint16_t ethertype;
+} __attribute__((__packed__));
+
+/* Makes an ethernet II frame, without tag, assuming CRC is already
+ * computed.
+ */
 ethernet_error_t make_frame(struct eth_frame* frame, char* buffer, size_t size) {
-    /* TODO */
+    struct ethII_header* hd = (struct ethII_header*)buffer;
+    int* crc = (int*)(buffer + sizeof(struct ethII_header) + frame->size);
+    size_t pack_size = sizeof(struct ethII_header) + 4 + frame->size;
+    if(pack_size > size) return ETH_INVALID;
+
+    for(size_t i = 0; i < 12; ++i) hd->bytes[i] = (i >= 6 ? frame->src.bytes[i-6] : frame->dst.bytes[i]);
+    hd->ethertype = frame->ethertype;
+    memcpy(buffer + sizeof(struct ethII_header), frame->data, frame->size);
+    *crc = frame->crc; /* Is this endian dependant ? */
+
+    return ETH_SUCCESS;
 }
 
 ethernet_error_t decode_frame(char* buffer, size_t* size, struct eth_frame* frame) {
