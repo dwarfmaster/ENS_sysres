@@ -58,9 +58,17 @@ struct ethII_header {
 
 struct ethII_header_tagged {
     uint8_t bytes[12];
-    uint32_t tag;
+    uint16_t tpid;
+    uint16_t tci;
     uint16_t ethertype;
 } __attribute__((__packed__));
+
+struct eth_header_llc {
+    uint8_t dsap, ssap;
+    uint8_t control;
+    struct eth_snap snap;
+} __attribute__((__packed__));
+
 
 /* Makes an ethernet II frame, without tag, assuming CRC is already
  * computed.
@@ -79,7 +87,66 @@ ethernet_error_t make_frame(struct eth_frame* frame, char* buffer, size_t size) 
     return ETH_SUCCESS;
 }
 
-ethernet_error_t decode_frame(char* buffer, size_t* size, struct eth_frame* frame) {
-    /* TODO */
+
+
+
+ethernet_error_t decode_frame(char* buffer, size_t size, struct eth_frame* frame) {
+    struct ethII_header* hd = (struct ethII_header*)buffer;
+    struct ethII_header_tagged* hd_tag = (struct ethII_header_tagged*)buffer;
+    char* data = NULL;
+    uint32_t* crc = (uint32_t*)(buffer + size - 4);
+    if(size < 64) return ETH_INVALID;
+
+
+    if(hd->ethertype == 0x8100) {
+        frame->tag       = hd_tag->tci;
+        frame->ethertype = hd_tag->ethertype;
+        data             = buffer + sizeof(struct ethII_header_tagged);
+    } else {
+        frame->tag       = 0; /* This value is reserved when tag is present, so
+                               * it can be used to test the absence of tag
+                               */
+        frame->ethertype = hd->ethertype;
+        data             = buffer + sizeof(struct ethII_header);
+    }
+
+
+    struct eth_header_llc* llc = (struct eth_header_llc*)data;
+    if(frame->ethertype >= 1536) { /* Ethernet II frame, ie DIX ethernet */
+        frame->size = size - (data - buffer) - 4;
+        frame->data = data;
+        frame->crc  = *crc;
+        return ETH_SUCCESS;
+    }
+    
+    else if(frame->ethertype <= 1500) {
+        /* Novel Raw IPX */
+        if(llc->dsap == 0xFF && llc->ssap == 0xFF) {
+            frame->size      = frame->ethertype;
+            frame->crc       = *crc;
+            frame->data      = data;
+            frame->ethertype = 0x8137; /* IPX ethertype */
+        }
+        /* Snap extension */
+        else if(llc->dsap == 0xAA && llc->ssap == 0xAA) {
+            frame->size      = frame->ethertype - 8;
+            frame->crc       = *crc;
+            frame->data      = data + 8;
+            frame->snap      = llc->snap;
+            frame->ethertype = 0; /* Invalid ethertype => snap must be used */
+        }
+        /* Standart LLC-only ethernet */
+        else {
+            /* TODO : we won't handle it for now, it's too complicated */
+            return ETH_INVALID; /* Drop the frame */
+        }
+
+        if(frame->size + 4 + (size_t)(data - buffer) != size) return ETH_INVALID;
+        else                                                  return ETH_SUCCESS;
+    }
+    
+    else {
+        return ETH_INVALID;
+    }
 }
 
