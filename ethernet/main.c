@@ -1,16 +1,18 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "ethernet.h"
 
 int main(int argc, char *argv[]) {
-    struct mac_address addr;
     char buffer[256];
+    size_t n;
+    uint32_t crc;
     while(1) {
-        scanf("%s", buffer);
-        if(read_mac_address(buffer, &addr) != ETH_SUCCESS) break;
-        printf("%d - %d - %d - %d - %d - %d\n", addr.bytes[0], addr.bytes[1],
-                addr.bytes[2], addr.bytes[3], addr.bytes[4], addr.bytes[5]);
+        n = 256;
+        getline(&buffer, &n, stdin);
+        if(compute_crc(buffer, strlen(buffer), &crc) != ETH_SUCCESS) break;
+        printf("%08X\n", crc);
     }
     printf("Invalid\n");
     return 0;
