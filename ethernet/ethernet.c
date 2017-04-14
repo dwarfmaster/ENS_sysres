@@ -113,7 +113,7 @@ uint32_t reflect32(uint32_t v) {
  *   https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code
  */
 ethernet_error_t compute_crc(const char* buffer, size_t size, uint32_t* crc) {
-//    if(size < 60 || size > 1518) return ETH_INVALID;
+    if(size < 60 || size > 1518) return ETH_INVALID;
     *crc = 0xFFFFFFFF;
     uint8_t data;
     for(size_t byte = 0; byte < size; ++byte) {

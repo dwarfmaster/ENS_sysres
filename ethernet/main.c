@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "ethernet.h"
+#include "logging.h"
 
 int main(int argc, char *argv[]) {
     char buffer[256];
@@ -10,11 +11,11 @@ int main(int argc, char *argv[]) {
     uint32_t crc;
     while(1) {
         n = 256;
-        getline(&buffer, &n, stdin);
+        scanf("%s", buffer);
         if(compute_crc(buffer, strlen(buffer), &crc) != ETH_SUCCESS) break;
-        printf("%08X\n", crc);
+        log_variadic("%08X\n", crc);
     }
-    printf("Invalid\n");
+    log_string("Invalid");
     return 0;
 }
 
