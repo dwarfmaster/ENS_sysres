@@ -1,7 +1,7 @@
 
 CFLAGS=-Wall -Wextra -g -D_GNU_SOURCE
 CC=gcc
-OBJS=logging.o
+OBJS=logging.o ports.o
 LIB=lib.a
 
 all: $(LIB)
