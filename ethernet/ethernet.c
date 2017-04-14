@@ -1,5 +1,6 @@
 
 #include "ethernet.h"
+#include "logging.h"
 #include <string.h>
 
 int char_value(char c) {
@@ -209,17 +210,17 @@ ethernet_error_t decode_frame(char* buffer, size_t size, struct eth_frame* frame
             frame->data      = data;
             frame->ethertype = 0x8137; /* IPX ethertype */
         }
+        /* TODO : we won't handle anything for now, it's too complicated, and doesn't seem
+         * used in pratice.
+         */
         /* Snap extension */
         else if(llc->dsap == 0xAA && llc->ssap == 0xAA) {
-            frame->size      = frame->ethertype - 8;
-            frame->crc       = *crc;
-            frame->data      = data + 8;
-            frame->snap      = llc->snap;
-            frame->ethertype = 0; /* Invalid ethertype => snap must be used */
+            log_string("Unhandled LLC-SNAP ethernet frame");
+            return ETH_INVALID;
         }
         /* Standart LLC-only ethernet */
         else {
-            /* TODO : we won't handle it for now, it's too complicated */
+            log_string("Unhandled LLC ethernet frame");
             return ETH_INVALID; /* Drop the frame */
         }
 
