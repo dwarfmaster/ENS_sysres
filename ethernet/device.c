@@ -1,5 +1,9 @@
 
 #include "device.h"
+#include "ethernet.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -113,5 +117,47 @@ ethernet_error_t open_file_device(struct device* dev, const char* path) {
  ****************************************************************/
 ethernet_error_t open_mach_device(struct device* dev, const char* name) {
     /* TODO */
+}
+
+/****************************************************************
+ *********************** Dummy Device ***************************
+ ****************************************************************/
+ethernet_error_t dummy_write(void* dev, void* data, size_t* size) {
+    printf("Sending message of size %u\n", *size);
+    return ETH_SUCCESS;
+}
+
+static char buffer[2048];
+ethernet_error_t dummy_read(void* dev, void* data, size_t* size) {
+    struct eth_frame fr;
+
+    printf("Source: ");
+    scanf("%s", buffer);
+    read_mac_address(buffer, &fr.src);
+    printf("Destination: ");
+    scanf("%s", buffer);
+    read_mac_address(buffer, &fr.dst);
+
+    printf("Ethertype: ");
+    scanf("%hX", &fr.ethertype);
+    printf("Data: ");
+    scanf("%s", buffer);
+
+    fr.size = strlen(buffer);
+    *size   = fr.size;
+    fr.data = buffer;
+    return make_frame(&fr, data, *size);
+}
+
+ethernet_error_t dummy_close(void* dev) {
+    return ETH_SUCCESS;
+}
+
+ethernet_error_t open_dummy_device(struct device* dev) {
+    dev->dev   = NULL;
+    dev->write = dummy_write;
+    dev->read  = dummy_read;
+    dev->close = dummy_close;
+    return ETH_SUCCESS;
 }
 

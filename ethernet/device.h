@@ -15,6 +15,7 @@ struct device {
 
 ethernet_error_t open_file_device(struct device* dev, const char* path);
 ethernet_error_t open_mach_device(struct device* dev, const char* name);
+ethernet_error_t open_dummy_device(struct device* dev);
 
 #endif//DEF_ETHERNET_DEVICE
 
