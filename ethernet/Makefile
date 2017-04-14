@@ -1,6 +1,6 @@
 
 CFLAGS=-Wall -Wextra -g -D_GNU_SOURCE -I ../lib
-LDFLAGS=
+LDFLAGS=-lpthread
 CC=gcc
 OBJS=main.o device.o ethernet.o ethertypes.o
 PROG=eth.out

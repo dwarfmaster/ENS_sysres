@@ -4,13 +4,18 @@
 
 #include <mach.h>
 #include <hurd.h>
+#include <pthread.h>
+#include "ethernet.h"
 #include "types.h"
 
 struct device {
-    void* dev;
-    ethernet_error_t (*write)(void*, void*, size_t*); // dev data size
-    ethernet_error_t (*read)(void*, void*, size_t*);
-    ethernet_error_t (*close)(void*);
+    pthread_t thread;
+    /* Send data to this port to send it from the device */
+    mach_port_t out;
+    /* Read from this port to receive frames */
+    mach_port_t in;
+    /* The address of the device */
+    struct mac_address mac;
 };
 
 ethernet_error_t open_file_device(struct device* dev, const char* path);

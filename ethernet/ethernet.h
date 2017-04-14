@@ -2,13 +2,10 @@
 #ifndef DEF_ETHERNET_ETHERNET
 #define DEF_ETHERNET_ETHERNET
 
-#include "device.h"
 #include <stdint.h>
-
-struct eth_device {
-    struct device dev;
-    /* TODO */
-};
+#include <stdio.h>
+#include <stdint.h>
+#include "types.h"
 
 struct mac_address {
     uint8_t bytes[6];

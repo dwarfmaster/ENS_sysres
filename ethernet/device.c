@@ -8,13 +8,14 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/select.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 /****************************************************************
  *********************** File Device ****************************
  ****************************************************************/
-ethernet_error_t file_write(void* pfd, void* data, size_t* size) {
-    int fd = (int)pfd;
+ethernet_error_t file_write(int fd, void* data, size_t* size) {
     ssize_t written;
 
     written = write(fd, data, *size);
@@ -41,8 +42,7 @@ ethernet_error_t file_write(void* pfd, void* data, size_t* size) {
     return ETH_SUCCESS;
 }
 
-ethernet_error_t file_read(void* pfd, void* data, size_t* size) {
-    int fd = (int)pfd;
+ethernet_error_t file_read(int fd, void* data, size_t* size) {
     ssize_t rd;
 
     rd = read(fd, data, *size);
@@ -67,17 +67,49 @@ ethernet_error_t file_read(void* pfd, void* data, size_t* size) {
     return ETH_SUCCESS;
 }
 
-ethernet_error_t file_close(void* pfd) {
-    int fd = (int)pfd;
+ethernet_error_t file_close(int fd) {
     close(fd);
     return ETH_SUCCESS;
 }
 
-ethernet_error_t open_file_device(struct device* dev, const char* path) {
+struct file_device_main_data {
     int fd;
+    mach_port_t in;
+    mach_port_t out;
+};
 
-    fd = open(path, O_RDWR | O_APPEND);
-    if(fd == -1) {
+void* file_device_main(void* data) {
+    char buffer[4096];
+    size_t size;
+    struct file_device_main_data* params = data;
+    fd_set in, out;
+
+    while(1) {
+        FD_SET(params->fd, &in);
+        FD_SET(params->fd, &out);
+        select(params->fd, &in, &out, NULL, NULL);
+
+        if(FD_ISSET(params->fd, &in)) {
+            size = read(params->fd, buffer, 4096);
+            /* TODO send frame to params->out */
+        }
+
+        if(FD_ISSET(params->fd, &out)) {
+            /* TODO read from params->in and write it to params->fd */
+        }
+    }
+}
+
+ethernet_error_t open_file_device(struct device* dev, const char* path) {
+    struct file_device_main_data* data;
+    kern_return_t ret;
+    int pret;
+
+    data = malloc(sizeof(struct file_device_main_data));
+    if(!data) return ETH_AGAIN;
+
+    data->fd = open(path, O_RDWR | O_APPEND);
+    if(data->fd == -1) {
         switch(errno) {
             case EWOULDBLOCK:
                 return ETH_AGAIN;
@@ -105,10 +137,35 @@ ethernet_error_t open_file_device(struct device* dev, const char* path) {
         }
     }
 
-    dev->dev   = (void*)fd;
-    dev->write = file_write;
-    dev->read  = file_read;
-    dev->close = file_close;
+    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &data->in);
+    if(ret != KERN_SUCCESS) {
+        close(data->fd);
+        free(data);
+        return ETH_IO;
+    }
+
+    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &data->out);
+    if(ret != KERN_SUCCESS) {
+        close(data->fd);
+        mach_port_deallocate(mach_task_self(), data->in);
+        free(data);
+        return ETH_IO;
+    }
+
+    dev->out = data->in;
+    dev->in  = data->out;
+    /* TODO find MAC address */
+
+    pret = pthread_create(&dev->thread, NULL, file_device_main, (void*)data);
+    if(pret) {
+        close(data->fd);
+        mach_port_deallocate(mach_task_self(), data->in);
+        mach_port_deallocate(mach_task_self(), data->out);
+        free(data);
+        return ETH_AGAIN;
+    }
+
+
     return ETH_SUCCESS;
 }
 
@@ -154,10 +211,12 @@ ethernet_error_t dummy_close(void* dev) {
 }
 
 ethernet_error_t open_dummy_device(struct device* dev) {
+    /*
     dev->dev   = NULL;
     dev->write = dummy_write;
     dev->read  = dummy_read;
     dev->close = dummy_close;
+    */
     return ETH_SUCCESS;
 }
 
