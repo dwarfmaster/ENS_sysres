@@ -1,6 +1,7 @@
 
 #include "device.h"
 #include "ethernet.h"
+#include "ports.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -82,6 +83,7 @@ void* file_device_main(void* data) {
     char buffer[4096];
     size_t size;
     struct file_device_main_data* params = data;
+    typeinfo_t tpinfo;
     fd_set in, out;
 
     while(1) {
@@ -90,12 +92,17 @@ void* file_device_main(void* data) {
         select(params->fd, &in, &out, NULL, NULL);
 
         if(FD_ISSET(params->fd, &in)) {
-            size = read(params->fd, buffer, 4096);
-            /* TODO send frame to params->out */
+            size = read(params->fd, buffer, 4000);
+            tpinfo.id     = 0; /* TODO fill ids */
+            tpinfo.size   = size;
+            tpinfo.number = 1;
+            send_data(params->out, &tpinfo, buffer);
         }
 
         if(FD_ISSET(params->fd, &out)) {
-            /* TODO read from params->in and write it to params->fd */
+            if(!receive_data(params->in, &tpinfo, buffer)) continue;
+            /* TODO assert on tpinfo id */
+            write(params->fd, buffer, tpinfo.size * tpinfo.number);
         }
     }
 }
