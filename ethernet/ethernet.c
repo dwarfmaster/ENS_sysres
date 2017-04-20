@@ -118,9 +118,10 @@ ethernet_error_t compute_crc(const char* buffer, size_t size, uint32_t* crc) {
 
 ethernet_error_t check_crc(const char* buffer, size_t size, uint32_t crc) {
     uint32_t computed;
-    compute_crc(buffer, size, &computed);
-    if(computed == crc) return ETH_SUCCESS;
-    else                return ETH_AGAIN;
+    ethernet_error_t err = compute_crc(buffer, size, &computed);
+    if(err != ETH_SUCCESS) return err;
+    if(computed == crc)    return ETH_SUCCESS;
+    else                   return ETH_INVALID;
 }
 
 /*****************************************************************
