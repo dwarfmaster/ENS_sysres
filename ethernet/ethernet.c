@@ -17,10 +17,6 @@ int pair_value(const char* src, size_t id) {
     else                 return i1 * 16 + i2;
 }
 
-#define READ_PAIR(j) \
-    i = pair_value(src, 3*j); \
-    if(i < 0) return ETH_INVALID; \
-    dst->bytes[j] = (uint8_t)i
 ethernet_error_t read_mac_address(const char* src, struct mac_address* dst) {
     /* TODO : support other formats */
     int i;
@@ -30,12 +26,11 @@ ethernet_error_t read_mac_address(const char* src, struct mac_address* dst) {
         return ETH_INVALID;
     }
 
-    READ_PAIR(0);
-    READ_PAIR(1);
-    READ_PAIR(2);
-    READ_PAIR(3);
-    READ_PAIR(4);
-    READ_PAIR(5);
+    for(int j = 0; j < 6; ++j) {
+        i = pair_value(src, 3*j);
+        if(i < 0) return ETH_INVALID;
+        dst->bytes[j] = (uint8_t)i;
+    }
     return ETH_SUCCESS;
 }
 
