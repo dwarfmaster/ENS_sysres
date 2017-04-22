@@ -5,104 +5,53 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/select.h>
+#include <error.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <hurd.h>
+#include <hurd/io.h>
 
 /****************************************************************
  *********************** File Device ****************************
  ****************************************************************/
-ethernet_error_t file_write(int fd, void* data, size_t* size) {
-    ssize_t written;
-
-    written = write(fd, data, *size);
-    if(written == -1) {
-        *size = 0;
-        switch(errno) {
-            case EAGAIN:
-            case EINTR:
-                return ETH_AGAIN;
-            case EIO:
-            case EFBIG:
-            case ENOSPC:
-            case EPIPE:
-                return ETH_IO;
-            case EBADF:
-            case EFAULT:
-            case EINVAL:
-            default:
-                return ETH_INVALID;
-        }
-    }
-
-    *size = written;
-    return ETH_SUCCESS;
-}
-
-ethernet_error_t file_read(int fd, void* data, size_t* size) {
-    ssize_t rd;
-
-    rd = read(fd, data, *size);
-    if(rd == -1) {
-        *size = 0;
-        switch(errno) {
-            case EAGAIN:
-            case EINTR:
-                return ETH_AGAIN;
-            case EIO:
-                return ETH_IO;
-            case EBADF:
-            case EISDIR:
-            case EFAULT:
-            case EINVAL:
-            default:
-                return ETH_INVALID;
-        }
-    }
-
-    *size = rd;
-    return ETH_SUCCESS;
-}
-
-ethernet_error_t file_close(int fd) {
-    close(fd);
-    return ETH_SUCCESS;
-}
-
 struct file_device_main_data {
-    int fd;
+    file_t fd;
     mach_port_t in;
+    mach_port_t sel; /* Sel is used for select queries on fd */
+    mach_port_t set; /* Contains sel and in */
     mach_port_t out;
 };
 
 void* file_device_main(void* data) {
     char buffer[4096];
-    size_t size;
+    char* buf;
+    size_t size, rd, wr;
     struct file_device_main_data* params = data;
     typeinfo_t tpinfo;
-    fd_set in, out;
 
     while(1) {
-        FD_SET(params->fd, &in);
-        FD_SET(params->fd, &out);
-        select(params->fd, &in, &out, NULL, NULL);
+        __io_select_request(params->fd, params->sel, SELECT_READ);
+        if(!receive_data(params->in, &tpinfo, buffer, 4096)) continue;
 
-        if(FD_ISSET(params->fd, &in)) {
-            size = read(params->fd, buffer, 4000);
-            tpinfo.id     = 0; /* TODO fill ids */
-            tpinfo.size   = size;
-            tpinfo.number = 1;
-            send_data(params->out, &tpinfo, buffer);
-        }
-
-        if(FD_ISSET(params->fd, &out)) {
-            if(!receive_data(params->in, &tpinfo, buffer)) continue;
-            /* TODO assert on tpinfo id */
-            write(params->fd, buffer, tpinfo.size * tpinfo.number);
+        switch(tpinfo.id) {
+            case 2: /* type id from select */
+                buf = buffer;
+                io_read(params->fd, &buf, &size, -1, 4096);
+                tpinfo.number = 1;
+                tpinfo.size   = size;
+                tpinfo.id     = 42; /* TODO define code for ethernet frame */
+                send_data(params->out, &tpinfo, buf);
+                break;
+            default: /* TODO define code for ethernet frame */
+                size = tpinfo.size * tpinfo.number;
+                rd = 0;
+                while(size > 0) {
+                    io_write(params->fd, buffer + rd, size, -1, &wr);
+                    rd   += wr;
+                    size -= wr;
+                }
+                break;
         }
     }
 }
@@ -111,53 +60,39 @@ ethernet_error_t open_file_device(struct device* dev, const char* path) {
     struct file_device_main_data* data;
     kern_return_t ret;
     int pret;
+    ethernet_error_t err;
+    data      = NULL;
 
     data = malloc(sizeof(struct file_device_main_data));
-    if(!data) return ETH_AGAIN;
-
-    data->fd = open(path, O_RDWR | O_APPEND);
-    if(data->fd == -1) {
-        switch(errno) {
-            case EWOULDBLOCK:
-                return ETH_AGAIN;
-            case ELOOP:
-            case EMFILE:
-            case ENFILE:
-            case ENODEV:
-            case ENOMEM:
-            case ENOSPC:
-            case ENXIO:
-            case EOVERFLOW:
-                return ETH_IO;
-            case EROFS:
-            case ETXTBSY:
-            case EPERM:
-            case ENOTDIR:
-            case ENOENT:
-            case ENAMETOOLONG:
-            case EACCES:
-            case EEXIST:
-            case EFAULT:
-            case EISDIR:
-            default:
-                return ETH_INVALID;
-        }
+    if(!data) {
+        err = ETH_AGAIN;
+        goto err;
     }
+
+    data->fd  = MACH_PORT_NULL;
+    data->in  = MACH_PORT_NULL;
+    data->sel = MACH_PORT_NULL;
+    data->set = MACH_PORT_NULL;
+    data->out = MACH_PORT_NULL;
+    err = ETH_IO;
+
+    data->fd = file_name_lookup(path, O_READ | O_WRITE, 0);
+    if(data->fd == MACH_PORT_NULL) goto err;
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &data->in);
-    if(ret != KERN_SUCCESS) {
-        close(data->fd);
-        free(data);
-        return ETH_IO;
-    }
+    if(ret != KERN_SUCCESS) goto err;
+    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &data->sel);
+    if(ret != KERN_SUCCESS) goto err;
+
+    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_PORT_SET, &data->set);
+    if(ret != KERN_SUCCESS) goto err;
+    err = mach_port_move_member(mach_task_self(), data->sel, data->set);
+    if(ret != KERN_SUCCESS) goto err;
+    err = mach_port_move_member(mach_task_self(), data->fd, data->set);
+    if(ret != KERN_SUCCESS) goto err;
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &data->out);
-    if(ret != KERN_SUCCESS) {
-        close(data->fd);
-        mach_port_deallocate(mach_task_self(), data->in);
-        free(data);
-        return ETH_IO;
-    }
+    if(ret != KERN_SUCCESS) goto err;
 
     dev->out = data->in;
     dev->in  = data->out;
@@ -165,15 +100,22 @@ ethernet_error_t open_file_device(struct device* dev, const char* path) {
 
     pret = pthread_create(&dev->thread, NULL, file_device_main, (void*)data);
     if(pret) {
-        close(data->fd);
-        mach_port_deallocate(mach_task_self(), data->in);
-        mach_port_deallocate(mach_task_self(), data->out);
-        free(data);
-        return ETH_AGAIN;
+        err = ETH_AGAIN;
+        goto err;
     }
 
-
     return ETH_SUCCESS;
+
+err:
+    if(data) {
+        if(data->fd  != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), data->fd);
+        if(data->in  != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), data->in);
+        if(data->out != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), data->out);
+        if(data->set != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), data->sel);
+        if(data->set != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), data->set);
+        free(data);
+    }
+    return err;
 }
 
 /****************************************************************
