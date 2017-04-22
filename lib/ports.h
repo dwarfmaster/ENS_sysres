@@ -13,7 +13,7 @@
  */
 typedef struct typeinfo {
     unsigned int id;
-    unsigned int size;
+    unsigned int size;   /* Size in bytes of the type */
     unsigned int number; /* Number of elements of that type */
 } typeinfo_t;
 

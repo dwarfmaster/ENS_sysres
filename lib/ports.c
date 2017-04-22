@@ -20,7 +20,7 @@ int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
     hd->head.msgh_remote_port = port;
 
     hd->type.msgt_name = info->id;
-    hd->type.msgt_size = info->size;
+    hd->type.msgt_size = info->size * 8;
     hd->type.msgt_number = info->number;
     hd->type.msgt_inline = TRUE;
     hd->type.msgt_longform = FALSE;
@@ -44,7 +44,7 @@ int receive_data(mach_port_t port, typeinfo_t* info, char* buffer, size_t size) 
     if(err != MACH_MSG_SUCCESS) return 0;
 
     info->id     = hd->type.msgt_name;
-    info->size   = hd->type.msgt_size;
+    info->size   = hd->type.msgt_size / 8;
     info->number = hd->type.msgt_number;
     memmove(buffer, buffer + sizeof(struct message_full_header), info->size * info->number);
     return 1;
