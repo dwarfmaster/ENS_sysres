@@ -2,6 +2,8 @@
 #include "device.h"
 #include "ethernet.h"
 #include "ports.h"
+#include "proto.h"
+#include "logging.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,10 +34,10 @@ void* file_device_main(void* data) {
 
     while(1) {
         __io_select_request(params->fd, params->sel, SELECT_READ);
-        if(!receive_data(params->in, &tpinfo, buffer, 4096)) continue;
+        if(!receive_data(params->set, &tpinfo, buffer, 4096)) continue;
 
         switch(tpinfo.id) {
-            case 2: /* type id from select */
+            case lvl1_frame: /* type id from select */
                 buf = buffer;
                 io_read(params->fd, &buf, &size, -1, 4096);
                 tpinfo.number = 1;
@@ -43,7 +45,7 @@ void* file_device_main(void* data) {
                 tpinfo.id     = 42; /* TODO define code for ethernet frame */
                 send_data(params->out, &tpinfo, buf);
                 break;
-            default: /* TODO define code for ethernet frame */
+            case lvl2_frame:
                 size = tpinfo.size * tpinfo.number;
                 rd = 0;
                 while(size > 0) {
@@ -51,6 +53,9 @@ void* file_device_main(void* data) {
                     rd   += wr;
                     size -= wr;
                 }
+                break;
+            default:
+                log_variadic("Device thread received invalid type id : %d\n", tpinfo.id);
                 break;
         }
     }

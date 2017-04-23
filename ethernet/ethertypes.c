@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <hurd.h>
 #include <hurd/io.h>
 #include <hurd/trivfs.h>
@@ -21,6 +22,8 @@ struct type_file {
 static struct type_file* opened[256];
 static char* type_dir;
 static char* type_buffer;
+static mach_port_t main_in;
+static mach_port_t main_out;
 
 static inline uint8_t hash(uint16_t fd) {
     return fd % 256;
@@ -38,8 +41,8 @@ static inline struct type_file* lookup(uint16_t tp) {
     return NULL;
 }
 
-ethernet_error_t types_init(const char* dir) {
-    for(int i = 0; i < 256; ++i) opened[256] = NULL;
+ethernet_error_t types_init(const char* dir, mach_port_t to_main, mach_port_t from_main) {
+    for(int i = 0; i < 256; ++i) opened[i] = NULL;
     size_t len = strlen(dir);
     type_dir = malloc(len);
     if(!type_dir) return ETH_AGAIN;
@@ -55,6 +58,9 @@ ethernet_error_t types_init(const char* dir) {
         free(type_dir);
         return ETH_AGAIN;
     }
+
+    main_in = to_main;
+    main_out = from_main;
     return ETH_SUCCESS;
 }
 
@@ -87,7 +93,7 @@ void dispatch(uint16_t tp, uint16_t size, uint8_t* data) {
     write(tf->fd, data,  size);
 }
 
-/* TivFS symbols */
+/* TrivFS symbols */
 int trivfs_fstype = FSTYPE_MISC;
 int trivfs_fsid = 0;
 int trivfs_allow_open = O_WRITE;
@@ -95,16 +101,21 @@ int trivfs_support_read  = 1;
 int trivfs_support_write = 1;
 int trivfs_support_exec  = 0;
 
+static char buffer[5];
+static int pos = 0;
+
 /* The file has nothing to read */
 error_t trivfs_S_io_read (struct trivfs_protid* cred, mach_port_t reply,
         mach_msg_type_name_t reply_type, vm_address_t* data,
         mach_msg_type_number_t* data_len, off_t offs,
-        mach_msg_type_number_t aount) {
+        mach_msg_type_number_t amount) {
     if(!cred)                                 return EOPNOTSUPP;
     else if (!(cred->po->openmodes & O_READ)) return EBADF;
+
     *data_len = 0;
     return 0;
 }
+
 error_t trivfs_S_io_readable(struct trivfs_protid* cred,
         mach_port_t reply, mach_msg_type_name_t replytype,
         mach_msg_type_number_t* amount) {
@@ -117,8 +128,6 @@ error_t trivfs_S_io_readable(struct trivfs_protid* cred,
 /* Register a new ethertype.
  * Ignore offset
  */
-static char buffer[5];
-static int pos = 0;
 error_t trivfs_S_io_write (struct trivfs_protid* cred,
         mach_port_t reply, mach_msg_type_name_t replytype,
         vm_address_t data, mach_msg_type_number_t datalen,
@@ -227,7 +236,6 @@ ethernet_error_t launch_registerer() {
 
     ports_manage_port_operations_one_thread(fsys->pi.bucket,
             trivfs_demuxer, 0);
-    return 0;
+    return ETH_SUCCESS;
 }
-
 
