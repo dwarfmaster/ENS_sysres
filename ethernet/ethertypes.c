@@ -1,6 +1,8 @@
 
 #include "ethertypes.h"
 #include "logging.h"
+#include "ports.h"
+#include "proto.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +16,7 @@
 #include <hurd/trivfs.h>
 
 struct type_file {
-    int fd;
+    mach_port_t fd;
     struct type_file* next;
     uint16_t tp;
 };
@@ -25,8 +27,8 @@ static char* type_buffer;
 static mach_port_t main_in;
 static mach_port_t main_out;
 
-static inline uint8_t hash(uint16_t fd) {
-    return fd % 256;
+static inline uint8_t hash(uint16_t tp) {
+    return tp % 256;
 }
 
 /* Returns NULL is not found */
@@ -65,32 +67,59 @@ ethernet_error_t types_init(const char* dir, mach_port_t to_main, mach_port_t fr
 }
 
 ethernet_error_t types_register(uint16_t tp) {
-    if(lookup(tp) == NULL) return ETH_INVALID;
+    /* TODO create reply port, send it the file and to main */
+    if(lookup(tp) != NULL) return ETH_INVALID;
+    char buffer[64];
     uint8_t hs = hash(tp);
     struct type_file* tf = malloc(sizeof(struct type_file));
+    typeinfo_t tpinfo;
     if(!tf) return ETH_AGAIN;
 
     sprintf(type_buffer, "%s/%04X", type_dir, tp);
-    tf->fd = open(type_buffer, O_WRONLY);
-    if(tf->fd < 0) {
+    tf->fd = file_name_lookup(type_buffer, O_READ | O_WRITE, 0);
+    if(tf->fd == MACH_PORT_NULL) {
+        log_variadic("Couldn't open %d\n", type_buffer);
         free(tf);
         return ETH_IO;
     }
 
+    /* Lock map */
+    tpinfo.id = reserved1;
+    tpinfo.size = 0;
+    tpinfo.number = 1;
+    send_data(main_in, &tpinfo, buffer);
+    /* Wait for lock acknowledgment from main */
+    do {
+        tpinfo.size = 0;
+        tpinfo.number = 1;
+        if(!receive_data(main_out, &tpinfo, buffer, 64)) continue;
+    } while(tpinfo.id != reserved1);
+
+    /* Update map */
     tf->tp = tp;
     tf->next = opened[hs];
     opened[hs] = tf;
+
+    /* Unlock map */
+    tpinfo.id = reserved2;
+    tpinfo.size = 0;
+    tpinfo.number = 1;
+    send_data(main_in, &tpinfo, buffer);
     return ETH_SUCCESS;
 }
 
-void dispatch(uint16_t tp, uint16_t size, uint8_t* data) {
+void dispatch(uint16_t tp, uint16_t size, char* data) {
     struct type_file* tf = lookup(tp);
+    typeinfo_t tpinfo;
     if(!tf) {
         log_variadic("Unhandled ethertype %04X\n", tp);
         return;
     }
-    write(tf->fd, &size, sizeof(uint16_t));
-    write(tf->fd, data,  size);
+
+    tpinfo.id     = lvl3_frame;
+    tpinfo.size   = size;
+    tpinfo.number = 1;
+    send_data(tf->fd, &tpinfo, data);
 }
 
 /* TrivFS symbols */

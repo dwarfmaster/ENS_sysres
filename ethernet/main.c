@@ -63,7 +63,11 @@ void* demuxer_thread(void* vargs) {
                 tmp = set;
                 set = set2;
                 set2 = tmp;
-                /* TODO */
+                /* Acknowledge lock */
+                tpinfo.id = reserved1;
+                tpinfo.size = 0;
+                tpinfo.number = 1;
+                send_data(args->to_trivfs, &tpinfo, buffer);
                 break;
 
             /* Data received from trivfs indicating end of a lock */
@@ -71,6 +75,7 @@ void* demuxer_thread(void* vargs) {
                 tmp = set;
                 set = set2;
                 set2 = tmp;
+                /* TODO add new received port to set */
                 break;
 
             /* Data received from one of the level3 ports */
