@@ -1,6 +1,6 @@
 
-CFLAGS=-Wall -Wextra -g -D_GNU_SOURCE -I ../lib
-LDFLAGS=-lpthread
+CFLAGS=-Wall -g -D_GNU_SOURCE -I ../lib
+LDFLAGS=-lpthread -ltrivfs -lfshelp -lports
 CC=gcc
 OBJS=main.o device.o ethernet.o ethertypes.o
 PROG=eth.out
