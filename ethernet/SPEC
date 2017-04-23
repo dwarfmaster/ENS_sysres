@@ -1,16 +1,13 @@
 
 Files :
- - RW :
-   + the ethernet device file.
  - R :
    + mnt/register : used to register new ethertypes. When an ethertype handler
-                    is ready, write the ethertype value to this file (the value
-                    directly, not an ascii representation).
-   + mnt/ethernet : used to send ethernet packets. A packet is a two bytes field
-                    specifying the whole size of the packet, a two byte ethetype,
-                    and the data.
- - W :
+                    is ready, write the ethertype value to this file, as an hexadecimal
+                    ascii representation, ended by newlines.
+ - RW :
    + ethertypes/XXXX : files where data from received ethernet frames with the
                        corresponding ethertype will be written. Before the data
-                       is a 2 byte field indicating the size of the data.
+                       is a 2 byte field indicating the size of the data. Writing
+                       data to these files will send the ethernet frame with the
+                       right ethertype.
 
