@@ -50,3 +50,14 @@ int receive_data(mach_port_t port, typeinfo_t* info, char* buffer, size_t size) 
     return 1;
 }
 
+int send_port_right(mach_port_t port, mach_port_t rcv) {
+    typeinfo_t tpinfo;
+    mach_port_t buffer[64];
+
+    tpinfo.id     = MACH_MSG_TYPE_MAKE_SEND;
+    tpinfo.size   = sizeof(mach_port_t);
+    tpinfo.number = 1;
+    buffer[0] = rcv;
+    return send_data(port, &tpinfo, (char*)buffer);
+}
+

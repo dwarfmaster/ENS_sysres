@@ -24,6 +24,8 @@ typedef struct typeinfo {
 int send_data(mach_port_t port, const typeinfo_t* info, char* data);
 /* info is only set, not read here */
 int receive_data(mach_port_t port, typeinfo_t* info, char* buffer, size_t size);
+/* Send a send port right to port made from the receive right rcv */
+int send_port_right(mach_port_t port, mach_port_t rcv);
 
 #endif//DEF_LIB_PORTS
 
