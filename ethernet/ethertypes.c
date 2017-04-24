@@ -91,6 +91,7 @@ ethernet_error_t types_register(uint16_t tp) {
     kern_return_t ret;
     struct reserved2_data* dt = (struct reserved2_data*)buffer;
     struct type_file* tf;
+    mach_port_t used;
     
     tf = malloc(sizeof(struct type_file));
     if(!tf) return ETH_AGAIN;
@@ -110,7 +111,8 @@ ethernet_error_t types_register(uint16_t tp) {
     send_data(main_in, &tpinfo, buffer);
     /* Wait for lock acknowledgment from main */
     do {
-        if(!receive_data(main_out, &tpinfo, buffer, 64)) continue;
+        used = main_out;
+        if(!receive_data(&used, &tpinfo, buffer, 64)) continue;
     } while(tpinfo.id != reserved1);
 
     /* Update map */

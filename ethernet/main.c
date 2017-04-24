@@ -52,7 +52,8 @@ void* demuxer_thread(void* vargs) {
 
     set2 = args->from_trivfs;
     while(1) {
-        if(!receive_data(set, &tpinfo, buffer, 4096)) continue;
+        tmp = set;
+        if(!receive_data(&set, &tpinfo, buffer, 4096)) continue;
 
         switch(tpinfo.id) {
             /* Data received from device thread */
@@ -60,6 +61,7 @@ void* demuxer_thread(void* vargs) {
                 err = decode_frame(buffer, tpinfo.size, &frame);
                 if(err != ETH_SUCCESS) continue;
                 dispatch(frame.ethertype, frame.size, frame.data);
+                set = tmp;
                 break;
 
             /* Data received from trivfs indicating lock */
@@ -86,10 +88,12 @@ void* demuxer_thread(void* vargs) {
             /* Data received from one of the level3 ports */
             case lvl3_frame:
                 /* TODO */
+                set = tmp;
                 break;
 
             default:
                 log_variadic("Main thread received invalid type id : %d\n", tpinfo.id);
+                set = tmp;
                 break;
         }
     }

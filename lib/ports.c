@@ -34,12 +34,12 @@ int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
 }
 
 /* TODO use timeout */
-int receive_data(mach_port_t port, typeinfo_t* info, char* buffer, size_t size) {
+int receive_data(mach_port_t* port, typeinfo_t* info, char* buffer, size_t size) {
     mach_msg_return_t err;
     struct message_full_header* hd = (struct message_full_header*)buffer;
     hd->head.msgh_size = size;
     err = mach_msg( &hd->head, MACH_RCV_MSG,
-            0, hd->head.msgh_size, port,
+            0, hd->head.msgh_size, *port,
             MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
     if(err != MACH_MSG_SUCCESS) return 0;
 
@@ -47,6 +47,7 @@ int receive_data(mach_port_t port, typeinfo_t* info, char* buffer, size_t size) 
     info->size   = hd->type.msgt_size / 8;
     info->number = hd->type.msgt_number;
     memmove(buffer, buffer + sizeof(struct message_full_header), info->size * info->number);
+    *port = hd->head.msgh_remote_port;
     return 1;
 }
 

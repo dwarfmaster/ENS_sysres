@@ -31,10 +31,12 @@ void* file_device_main(void* data) {
     size_t size, rd, wr;
     struct file_device_main_data* params = data;
     typeinfo_t tpinfo;
+    mach_port_t used;
 
     while(1) {
         __io_select_request(params->fd, params->sel, SELECT_READ);
-        if(!receive_data(params->set, &tpinfo, buffer, 4096)) continue;
+        used = params->set;
+        if(!receive_data(&used, &tpinfo, buffer, 4096)) continue;
 
         switch(tpinfo.id) {
             case lvl1_frame: /* type id from select */
