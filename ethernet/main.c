@@ -26,6 +26,7 @@ void* demuxer_thread(void* vargs) {
     char buffer[4096];
     size_t size;
     typeinfo_t tpinfo;
+    struct eth_frame frame;
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_PORT_SET, &set);
     if(ret != KERN_SUCCESS) {
@@ -56,7 +57,9 @@ void* demuxer_thread(void* vargs) {
         switch(tpinfo.id) {
             /* Data received from device thread */
             case lvl2_frame:
-                /* TODO */
+                err = decode_frame(buffer, tpinfo.size, &frame);
+                if(err != ETH_SUCCESS) continue;
+                dispatch(frame.ethertype, frame.size, frame.data);
                 break;
 
             /* Data received from trivfs indicating lock */
