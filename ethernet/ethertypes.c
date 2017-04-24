@@ -44,6 +44,22 @@ static inline struct type_file* lookup(uint16_t tp) {
     return NULL;
 }
 
+/* TODO optimize */
+uint16_t lookup_type(mach_port_t port) {
+    uint16_t hs;
+    struct type_file* nxt;
+
+    for(hs = 0; hs < 256; ++hs) {
+        nxt = opened[hs];
+        while(nxt != NULL) {
+            if(nxt->reply == port) return nxt->tp;
+            nxt = nxt->next;
+        }
+    }
+
+    return 0;
+}
+
 ethernet_error_t types_init(const char* dir, mach_port_t to_main, mach_port_t from_main) {
     for(int i = 0; i < 256; ++i) opened[i] = NULL;
     size_t len = strlen(dir);
