@@ -16,6 +16,11 @@ struct demuxer_args {
     const char* dev;
 };
 
+struct lvl32_data {
+    struct mac_address addr;
+    char* data;
+};
+
 void* demuxer_thread(void* vargs) {
     struct demuxer_args* args = (struct demuxer_args*)vargs;
     struct device dev;
@@ -27,6 +32,8 @@ void* demuxer_thread(void* vargs) {
     size_t size;
     typeinfo_t tpinfo;
     struct eth_frame frame;
+    struct lvl32_data* lvl32;
+    struct mac_address src; /* TODO discover local mac address */
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_PORT_SET, &set);
     if(ret != KERN_SUCCESS) {
@@ -87,7 +94,24 @@ void* demuxer_thread(void* vargs) {
 
             /* Data received from one of the level3 ports */
             case lvl3_frame:
-                /* TODO */
+                lvl32 = (struct lvl32_data*)buffer;
+                frame.src       = src;
+                frame.dst       = lvl32->addr;
+                frame.ethertype = lookup_type(set);
+                frame.size      = tpinfo.size - sizeof(struct mac_address);
+                frame.data      = lvl32->data;
+
+                size = 4096;
+                err = make_frame(&frame, buffer, &size);
+                if(err != ETH_SUCCESS) {
+                    log_variadic("Couldn't send frame of type %4X\n", frame.ethertype);
+                    continue;
+                }
+                tpinfo.id     = lvl2_frame;
+                tpinfo.size   = size;
+                tpinfo.number = 1;
+                send_data(dev.out, &tpinfo, buffer);
+
                 set = tmp;
                 break;
 
