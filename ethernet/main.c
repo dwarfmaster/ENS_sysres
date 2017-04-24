@@ -19,6 +19,7 @@ struct demuxer_args {
 void* demuxer_thread(void* vargs) {
     struct demuxer_args* args = (struct demuxer_args*)vargs;
     struct device dev;
+    struct reserved2_data* rs2data;
     mach_port_t set, set2, tmp;
     kern_return_t ret;
     ethernet_error_t err;
@@ -75,7 +76,8 @@ void* demuxer_thread(void* vargs) {
                 tmp = set;
                 set = set2;
                 set2 = tmp;
-                /* TODO add new received port to set */
+                rs2data = (struct reserved2_data*)buffer;
+                mach_port_move_member(mach_task_self(), rs2data->nport, set);
                 break;
 
             /* Data received from one of the level3 ports */

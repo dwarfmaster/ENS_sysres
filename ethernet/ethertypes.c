@@ -17,6 +17,7 @@
 
 struct type_file {
     mach_port_t fd;
+    mach_port_t reply;
     struct type_file* next;
     uint16_t tp;
 };
@@ -67,12 +68,15 @@ ethernet_error_t types_init(const char* dir, mach_port_t to_main, mach_port_t fr
 }
 
 ethernet_error_t types_register(uint16_t tp) {
-    /* TODO create reply port, send it the file and to main */
     if(lookup(tp) != NULL) return ETH_INVALID;
     char buffer[64];
     uint8_t hs = hash(tp);
-    struct type_file* tf = malloc(sizeof(struct type_file));
     typeinfo_t tpinfo;
+    kern_return_t ret;
+    struct reserved2_data* dt = (struct reserved2_data*)buffer;
+    struct type_file* tf;
+    
+    tf = malloc(sizeof(struct type_file));
     if(!tf) return ETH_AGAIN;
 
     sprintf(type_buffer, "%s/%04X", type_dir, tp);
@@ -90,8 +94,6 @@ ethernet_error_t types_register(uint16_t tp) {
     send_data(main_in, &tpinfo, buffer);
     /* Wait for lock acknowledgment from main */
     do {
-        tpinfo.size = 0;
-        tpinfo.number = 1;
         if(!receive_data(main_out, &tpinfo, buffer, 64)) continue;
     } while(tpinfo.id != reserved1);
 
@@ -100,10 +102,26 @@ ethernet_error_t types_register(uint16_t tp) {
     tf->next = opened[hs];
     opened[hs] = tf;
 
+    /* Create and send reply port to handler */
+    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &tf->reply);
+    if(ret != KERN_SUCCESS) {
+        log_variadic("Coudln't create reply port for %4X\n", tp);
+        free(tf);
+        return ETH_IO;
+    }
+    if(!send_port_right(tf->fd, tf->reply)) {
+        log_variadic("Couldn't send reply port for %4X\n", tp);
+        mach_port_deallocate(mach_task_self(), tf->reply);
+        free(tf);
+        return ETH_IO;
+    }
+
     /* Unlock map */
     tpinfo.id = reserved2;
-    tpinfo.size = 0;
+    tpinfo.size = sizeof(mach_port_t);
     tpinfo.number = 1;
+    dt->nport = tf->reply;
+    dt->tp    = tp;
     send_data(main_in, &tpinfo, buffer);
     return ETH_SUCCESS;
 }
