@@ -127,6 +127,38 @@ void* demuxer_thread(void* vargs) {
  * and launch trivfs on main thread
  */
 int main(int argc, char *argv[]) {
+    /* TODO handle arguments */
+    kern_return_t ret;
+    ethernet_error_t err;
+    int pret;
+    pthread_t thread;
+    struct demuxer_args args;
+    args.dev = "/dev/eth0";
+
+    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &args.to_trivfs);
+    if(ret != KERN_SUCCESS) {
+        log_string("Couldn't allocate to_trivfs port");
+        exit(EXIT_FAILURE);
+    }
+
+    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &args.from_trivfs);
+    if(ret != KERN_SUCCESS) {
+        log_string("Couldn't allocate from_trivfs port");
+        exit(EXIT_FAILURE);
+    }
+
+    err = types_init("/servers/ethernet/handlers", args.from_trivfs, args.to_trivfs);
+    if(err != ETH_SUCCESS) {
+        log_string("Couldn't init ethertypes map");
+        exit(EXIT_FAILURE);
+    }
+
+    pret = pthread_create(&thread, NULL, demuxer_thread, (void*)&args);
+    if(pret) {
+        log_string("Couldn't create demuxer thread");
+        exit(EXIT_FAILURE);
+    }
+
     launch_registerer();
     return 0;
 }
