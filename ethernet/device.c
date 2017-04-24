@@ -159,7 +159,7 @@ ethernet_error_t dummy_read(void* dev, void* data, size_t* size) {
     fr.size = strlen(buffer);
     *size   = fr.size;
     fr.data = buffer;
-    return make_frame(&fr, data, *size);
+    return make_frame(&fr, data, size);
 }
 
 ethernet_error_t dummy_close(void* dev) {
