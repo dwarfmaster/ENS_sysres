@@ -44,7 +44,7 @@ void* file_device_main(void* data) {
                 io_read(params->fd, &buf, &size, -1, 4096);
                 tpinfo.number = 1;
                 tpinfo.size   = size;
-                tpinfo.id     = 42; /* TODO define code for ethernet frame */
+                tpinfo.id     = lvl2_frame;
                 send_data(params->out, &tpinfo, buf);
                 break;
             case lvl2_frame:
