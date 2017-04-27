@@ -13,7 +13,7 @@
  */
 typedef struct typeinfo {
     unsigned int id;
-    unsigned int size;
+    unsigned int size;   /* Size in bytes of the type */
     unsigned int number; /* Number of elements of that type */
 } typeinfo_t;
 
@@ -22,8 +22,12 @@ typedef struct typeinfo {
  * data may be ovewritten during the sending.
  */
 int send_data(mach_port_t port, const typeinfo_t* info, char* data);
-/* info is only set, not read here */
-int receive_data(mach_port_t port, typeinfo_t* info, char* buffer, size_t size);
+/* info is only set, not read here
+ * If port is a port set, it is set to the real port from which the data came
+ */
+int receive_data(mach_port_t* port, typeinfo_t* info, char* buffer, size_t size);
+/* Send a send port right to port made from the receive right rcv */
+int send_port_right(mach_port_t port, mach_port_t rcv);
 
 #endif//DEF_LIB_PORTS
 

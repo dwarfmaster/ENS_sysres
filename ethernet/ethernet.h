@@ -21,7 +21,7 @@ struct eth_frame {
     struct mac_address src, dst; /* */
     uint16_t ethertype; /* */
     uint16_t size; /* */
-    uint32_t crc; /* */
+    uint32_t crc;
     uint16_t tag;
     struct eth_snap snap;
     char* data; /* */
@@ -31,8 +31,10 @@ ethernet_error_t read_mac_address(const char* src, struct mac_address* dst);
 ethernet_error_t compute_crc(const char* buffer, size_t size, uint32_t* crc);
 /* Returns ETH_AGAIN in case of failure and ETH_SUCCESS if crc is valid */
 ethernet_error_t check_crc(const char* buffer, size_t size, uint32_t crc);
-/* Creates an ethernet II protocol frame, without tagging */
-ethernet_error_t make_frame(struct eth_frame* frame, char* buffer, size_t size);
+/* Creates an ethernet II protocol frame, without tagging
+ * buffer and frame->data CAN overlap
+ */
+ethernet_error_t make_frame(struct eth_frame* frame, char* buffer, size_t* size);
 /* The frame is valid only as long as the buffer is.
  * size must be the size of the whole frame (determined by level 1
  * machinery)

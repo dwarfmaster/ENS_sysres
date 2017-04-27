@@ -150,15 +150,16 @@ struct eth_header_llc {
 /* Makes an ethernet II frame, without tag.
  * CRC does not need to be already computed.
  */
-ethernet_error_t make_frame(struct eth_frame* frame, char* buffer, size_t size) {
+ethernet_error_t make_frame(struct eth_frame* frame, char* buffer, size_t* size) {
     struct ethII_header* hd = (struct ethII_header*)buffer;
     uint32_t* crc = (uint32_t*)(buffer + sizeof(struct ethII_header) + frame->size);
     size_t pack_size = sizeof(struct ethII_header) + 4 + frame->size;
-    if(pack_size > size) return ETH_INVALID;
+    if(pack_size > *size) return ETH_INVALID;
 
     for(size_t i = 0; i < 12; ++i) hd->bytes[i] = (i >= 6 ? frame->src.bytes[i-6] : frame->dst.bytes[i]);
     hd->ethertype = frame->ethertype;
-    memcpy(buffer + sizeof(struct ethII_header), frame->data, frame->size);
+    memmove(buffer + sizeof(struct ethII_header), frame->data, frame->size);
+    *size = pack_size;
     return compute_crc(buffer, frame->size + sizeof(struct ethII_header), crc); /* Is this endian dependant ? */
 }
 
