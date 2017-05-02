@@ -3,7 +3,7 @@
 #define DEF_LIB_PROTO
 
 enum Id {
-    lvl1_frame = 2, /* Chosen to be the value of select message id */
+    lvl1_frame = 9, /* Chosen to be the value of device read */
     lvl2_frame,
     lvl3_frame,
     lvl32_frame, /* Data is a level-2 address and the data itself */
