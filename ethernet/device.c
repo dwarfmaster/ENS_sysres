@@ -29,6 +29,7 @@ struct file_device_main_data {
 void* file_device_main(void* data) {
     char buffer[4096];
     char* buf;
+    int size, written;
     struct file_device_main_data* params = data;
     typeinfo_t tpinfo;
     mach_port_t used;
@@ -46,7 +47,8 @@ void* file_device_main(void* data) {
                 send_data(params->out, &tpinfo, buf);
                 break;
             case lvl2_frame:
-                /* TODO write to device */
+                size = tpinfo.size;
+                device_write(params->dev, D_NOWAIT, 0, buffer, size, &written);
                 break;
             default:
                 log_variadic("Device thread received invalid type id : %d\n", tpinfo.id);
