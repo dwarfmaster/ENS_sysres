@@ -33,8 +33,7 @@ int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
     return 1;
 }
 
-/* TODO use timeout */
-int receive_data(mach_port_t* port, typeinfo_t* info, char* buffer, size_t size) {
+int receive_data_low(mach_port_t* port, mach_msg_header_t** tp, char* buffer, size_t size) {
     mach_msg_return_t err;
     struct message_full_header* hd = (struct message_full_header*)buffer;
     hd->head.msgh_size = size;
@@ -43,11 +42,19 @@ int receive_data(mach_port_t* port, typeinfo_t* info, char* buffer, size_t size)
             MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
     if(err != MACH_MSG_SUCCESS) return 0;
 
+    if(tp) *tp = &hd->head;
+    *port = hd->head.msgh_remote_port;
+    return 1;
+}
+
+int receive_data(mach_port_t* port, typeinfo_t* info, char* buffer, size_t size) {
+    struct message_full_header* hd;
+    if(!receive_data_low(port, (mach_msg_header_t**)&hd, buffer, size)) return 0;
+
     info->id     = hd->type.msgt_name;
     info->size   = hd->type.msgt_size / 8;
     info->number = hd->type.msgt_number;
-    memmove(buffer, buffer + sizeof(struct message_full_header), info->size * info->number);
-    *port = hd->head.msgh_remote_port;
+    memmove(buffer, (char*)hd, info->size * info->number);
     return 1;
 }
 

@@ -26,6 +26,8 @@ int send_data(mach_port_t port, const typeinfo_t* info, char* data);
  * If port is a port set, it is set to the real port from which the data came
  */
 int receive_data(mach_port_t* port, typeinfo_t* info, char* buffer, size_t size);
+/* hd is only set, it will point to the inside of buffer */
+int receive_data_low(mach_port_t* port, mach_msg_header_t** tp, char* buffer, size_t size);
 /* Send a send port right to port made from the receive right rcv */
 int send_port_right(mach_port_t port, mach_port_t rcv);
 
