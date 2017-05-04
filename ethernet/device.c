@@ -28,28 +28,33 @@ struct file_device_main_data {
 
 void* file_device_main(void* data) {
     char buffer[4096];
-    char* buf;
     int size, written;
     struct file_device_main_data* params = data;
     typeinfo_t tpinfo;
     mach_port_t used;
+    mach_msg_header_t* hd;
+    mach_msg_type_t* tp;
+    struct net_rcv_msg* net_msg;
 
     while(1) {
         used = params->set;
-        if(!receive_data(&used, &tpinfo, buffer, 4096)) continue;
+        if(!receive_data_low(&used, &hd, buffer, 4096)) continue;
 
         switch(tpinfo.id) {
-            case lvl1_frame: /* type id from select */
-                buf = buffer;
-                tpinfo.size   = tpinfo.number * tpinfo.size;
+            case lvl1_frame:
+                net_msg       = (struct net_rcv_msg*)hd;
+                tpinfo.size   = net_msg->packet_type.msgt_size * net_msg->packet_type.msgt_number;
                 tpinfo.number = 1;
-                tpinfo.id     = lvl2_frame;
-                send_data(params->out, &tpinfo, buf);
+                tpinfo.id     = lvl3_frame;
+                send_data(params->out, &tpinfo, net_msg->packet);
                 break;
+
             case lvl2_frame:
-                size = tpinfo.size;
+                tp = (mach_msg_type_t*)((char*)hd + sizeof(mach_msg_header_t));
+                size = tp->msgt_size * tp->msgt_number;
                 device_write(params->dev, D_NOWAIT, 0, buffer, size, &written);
                 break;
+
             default:
                 log_variadic("Device thread received invalid type id : %d\n", tpinfo.id);
                 break;
@@ -59,13 +64,13 @@ void* file_device_main(void* data) {
 
 static struct bpf_insn bpf_filter[] =
 {
-    {NETF_IN|NETF_BPF, 0, 0, 0},		/* Header. */
-    {BPF_LD|BPF_H|BPF_ABS, 0, 0, 12},		/* Load Ethernet type */
-    {BPF_JMP|BPF_JEQ|BPF_K, 2, 0, 0x0806},	/* Accept ARP */
-    {BPF_JMP|BPF_JEQ|BPF_K, 1, 0, 0x0800},	/* Accept IPv4 */
-    {BPF_JMP|BPF_JEQ|BPF_K, 0, 1, 0x86DD},	/* Accept IPv6 */
-    {BPF_RET|BPF_K, 0, 0, 1500},		/* And return 1500 bytes */
-    {BPF_RET|BPF_K, 0, 0, 0},			/* Or discard it all */
+    {NETF_IN|NETF_BPF, 0, 0, 0},           /* Header. */
+    {BPF_LD|BPF_H|BPF_ABS, 0, 0, 12},      /* Load Ethernet type */
+    {BPF_JMP|BPF_JEQ|BPF_K, 2, 0, 0x0806}, /* Accept ARP */
+    {BPF_JMP|BPF_JEQ|BPF_K, 1, 0, 0x0800}, /* Accept IPv4 */
+    {BPF_JMP|BPF_JEQ|BPF_K, 0, 1, 0x86DD}, /* Accept IPv6 */
+    {BPF_RET|BPF_K, 0, 0, 1500},           /* And return 1500 bytes */
+    {BPF_RET|BPF_K, 0, 0, 0},              /* Or discard it all */
 };
 static int bpf_filter_len = sizeof (bpf_filter) / sizeof (short);
 

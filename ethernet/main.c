@@ -33,7 +33,6 @@ void* demuxer_thread(void* vargs) {
     typeinfo_t tpinfo;
     struct eth_frame frame;
     struct lvl32_data* lvl32;
-    struct mac_address src; /* TODO discover local mac address */
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_PORT_SET, &set);
     if(ret != KERN_SUCCESS) {
@@ -64,10 +63,9 @@ void* demuxer_thread(void* vargs) {
 
         switch(tpinfo.id) {
             /* Data received from device thread */
-            case lvl2_frame:
-                err = decode_frame(buffer, tpinfo.size, &frame);
+            case lvl3_frame:
                 if(err != ETH_SUCCESS) continue;
-                dispatch(frame.ethertype, frame.size, frame.data);
+                dispatch(frame.ethertype, tpinfo.size, buffer);
                 set = tmp;
                 break;
 
@@ -93,9 +91,9 @@ void* demuxer_thread(void* vargs) {
                 break;
 
             /* Data received from one of the level3 ports */
-            case lvl3_frame:
+            case lvl32_frame:
                 lvl32 = (struct lvl32_data*)buffer;
-                frame.src       = src;
+                frame.src       = dev.mac;
                 frame.dst       = lvl32->addr;
                 frame.ethertype = lookup_type(set);
                 frame.size      = tpinfo.size - sizeof(struct mac_address);
