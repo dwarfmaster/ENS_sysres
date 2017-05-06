@@ -12,7 +12,8 @@ struct arp_params {
     uint8_t hlen, plen;
 };
 
-/* Returns the size of the request. Returns 0 in case of error */
+/* Returns the size of the request. Returns 0 in case of error.
+ * prcv CAN point into buffer */
 size_t make_request(const struct arp_params* prms, void* prcv,
         void* buffer, size_t size);
 size_t make_reply(struct arp_params* prms, void* prcv, void* hrcv,

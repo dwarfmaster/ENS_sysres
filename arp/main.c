@@ -92,6 +92,9 @@ int main(int argc, char *argv[]) {
     void *prcv, *hrcv;
     struct handler* handler;
     typeinfo_t tpinfo;
+    arp_register_t* reg;
+    arp_query_t* query;
+    mach_port_t ethernet_port;
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &fs_port);
     if(ret != KERN_SUCCESS) {
@@ -101,13 +104,16 @@ int main(int argc, char *argv[]) {
 
     /* TODO attach to filesystem */
 
+    ethernet_port = MACH_PORT_NULL;
     for(;;) {
         if(!receive_data_low(&fs_port, &hd, buf, 4096)) continue;
         tp = (mach_msg_type_t*)((char*)hd + sizeof(mach_msg_header_t));
         data = (char*)tp + sizeof(mach_msg_type_t);
         size = tp->msgt_size * tp->msgt_number;
 
-        switch(tpinfo.id) {
+        switch(tp->msgt_name) {
+            /* TODO receive ethernet_port */
+
             case lvl2_frame:
                 type = peek_ptype(data, size);
                 handler = lookup_from_ptype(type);
@@ -132,11 +138,19 @@ int main(int argc, char *argv[]) {
                 break;
 
             case arp_query:
-                /* TODO */
+                if(ethernet_port == MACH_PORT_NULL) continue;
+                query   = (arp_query_t*)data;
+                handler = lookup_from_ptype(query->type);
+                size    = make_request(&handler->params, query->addr, buf, 4096);
+                tpinfo.id     = lvl32_frame;
+                tpinfo.size   = size;
+                tpinfo.number = 1;
+                send_data(ethernet_port, &tpinfo, buf);
                 break;
 
             case arp_register:
-                /* TODO */
+                reg = (arp_register_t*)data;
+                add_handler(reg->type, reg->len, reg->data, reg->port);
                 break;
 
             default:
