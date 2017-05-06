@@ -2,6 +2,11 @@
 #ifndef DEF_LIB_PROTO
 #define DEF_LIB_PROTO
 
+#include <hurd.h>
+#include <mach.h>
+#include <stdlib.h>
+#include <stdint.h>
+
 enum Id {
     lvl1_frame = 9, /* Chosen to be the value of device read */
     lvl2_frame,
@@ -13,8 +18,28 @@ enum Id {
     reserved2,
     reserved3,
     arp_query,
+    arp_register,
     arp_answer
 };
+
+typedef struct arp_register {
+    mach_msg_type_t port_type;
+    mach_port_t port;
+
+    mach_msg_type_t content_type;
+    uint16_t type;
+    uint8_t  len;
+    char data[];
+} __attribute__ ((__packed__)) arp_register_t;
+
+/* An ARP answer is the requested logical address followed without
+ * gap by the physical address. */
+
+/* An ARP query is a type and a logical address to be queried */
+typedef struct arp_query {
+    uint16_t type;
+    char addr[];
+} __attribute__ ((__packed__)) arp_query_t;
 
 #endif//DEF_LIB_PROTO
 
