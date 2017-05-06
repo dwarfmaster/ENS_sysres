@@ -97,6 +97,8 @@ int main(int argc, char *argv[]) {
     mach_port_t ethernet_port;
     char* ha_addr;
 
+    /* TODO parse arguments */
+
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &fs_port);
     if(ret != KERN_SUCCESS) {
         log_string("Couldn't allocate fs port");

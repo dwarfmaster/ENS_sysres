@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 struct arp_params {
+    void *broadcast;
     void *haddr, *paddr;
     uint16_t htype, ptype;
     uint8_t hlen, plen;
