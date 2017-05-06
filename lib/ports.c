@@ -7,6 +7,24 @@ struct message_full_header {
     mach_msg_type_t type;
 };
 
+int send_data_low(mach_port_t port, size_t size, char* data) {
+    mach_msg_return_t err;
+    mach_msg_header_t* hd = (mach_msg_header_t*)data;
+    memmove(data + sizeof(mach_msg_header_t), data, size);
+
+    hd->msgh_bits = MACH_MSGH_BITS_REMOTE(
+            MACH_MSG_TYPE_MAKE_SEND);
+    hd->msgh_size = size + sizeof(struct message_full_header);
+    hd->msgh_local_port = MACH_PORT_NULL;
+    hd->msgh_remote_port = port;
+
+    err = mach_msg( hd, MACH_SEND_MSG,
+            hd->msgh_size, 0, MACH_PORT_NULL,
+            MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+    if(err != MACH_MSG_SUCCESS) return 0;
+    return 1;
+}
+
 int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
     mach_msg_return_t err;
     struct message_full_header* hd = (struct message_full_header*)data;
