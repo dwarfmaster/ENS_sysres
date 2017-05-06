@@ -95,6 +95,7 @@ int main(int argc, char *argv[]) {
     arp_register_t* reg;
     arp_query_t* query;
     mach_port_t ethernet_port;
+    char* ha_addr;
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &fs_port);
     if(ret != KERN_SUCCESS) {
@@ -105,6 +106,7 @@ int main(int argc, char *argv[]) {
     /* TODO attach to filesystem */
 
     ethernet_port = MACH_PORT_NULL;
+    ha_addr = NULL;
     for(;;) {
         if(!receive_data_low(&fs_port, &hd, buf, 4096)) continue;
         tp = (mach_msg_type_t*)((char*)hd + sizeof(mach_msg_header_t));
@@ -133,7 +135,13 @@ int main(int argc, char *argv[]) {
                     send_data(handler->out, &tpinfo, buf);
                 } else {
                     /* ARP query */
-                    /* TODO */
+                    if(ha_addr == NULL) continue;
+                    if(memcmp(prcv, handler->addr, handler->addr_len) != 0) continue;
+                    size = make_reply(&handler->params, prcv, ha_addr, buf, 4096);
+                    tpinfo.id     = lvl32_frame;
+                    tpinfo.size   = size;
+                    tpinfo.number = 1;
+                    send_data(ethernet_port, &tpinfo, buf);
                 }
                 break;
 
