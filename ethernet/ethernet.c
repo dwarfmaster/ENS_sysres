@@ -1,6 +1,7 @@
 
 #include "ethernet.h"
 #include "logging.h"
+#include "endian.h"
 #include <string.h>
 
 int char_value(char c) {
@@ -103,6 +104,7 @@ uint32_t reflect32(uint32_t v) {
 /* Returns an error if the size of the message is too big/too small. */
 /* Algorithm implementation taken from :
  *   https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code
+ * crc is stored in hardware (network) byte order
  */
 ethernet_error_t compute_crc(const char* buffer, size_t size, uint32_t* crc) {
     if(size < 60 || size > 1518) return ETH_INVALID;
@@ -113,12 +115,14 @@ ethernet_error_t compute_crc(const char* buffer, size_t size, uint32_t* crc) {
         *crc = crc_polybytes[data] ^ (*crc << 8);
     }
     *crc = reflect32(*crc) ^ 0xFFFFFFFF;
+    *crc = stoh32(*crc);
     return ETH_SUCCESS;
 }
 
+/* CRC is expected in software byte order */
 ethernet_error_t check_crc(const char* buffer, size_t size, uint32_t crc) {
     uint32_t computed;
-    ethernet_error_t err = compute_crc(buffer, size, &computed);
+    ethernet_error_t err = htos32(compute_crc(buffer, size, &computed));
     if(err != ETH_SUCCESS) return err;
     if(computed == crc)    return ETH_SUCCESS;
     else                   return ETH_INVALID;
@@ -157,10 +161,10 @@ ethernet_error_t make_frame(struct eth_frame* frame, char* buffer, size_t* size)
     if(pack_size > *size) return ETH_INVALID;
 
     for(size_t i = 0; i < 12; ++i) hd->bytes[i] = (i >= 6 ? frame->src.bytes[i-6] : frame->dst.bytes[i]);
-    hd->ethertype = frame->ethertype;
+    hd->ethertype = stoh16(frame->ethertype);
     memmove(buffer + sizeof(struct ethII_header), frame->data, frame->size);
     *size = pack_size;
-    return compute_crc(buffer, frame->size + sizeof(struct ethII_header), crc); /* Is this endian dependant ? */
+    return compute_crc(buffer, frame->size + sizeof(struct ethII_header), crc);
 }
 
 
@@ -174,15 +178,15 @@ ethernet_error_t decode_frame(char* buffer, size_t size, struct eth_frame* frame
     if(size < 64) return ETH_INVALID;
 
 
-    if(hd->ethertype == 0x8100) {
-        frame->tag       = hd_tag->tci;
-        frame->ethertype = hd_tag->ethertype;
+    if(htos16(hd->ethertype) == 0x8100) {
+        frame->tag       = htos16(hd_tag->tci);
+        frame->ethertype = htos16(hd_tag->ethertype);
         data             = buffer + sizeof(struct ethII_header_tagged);
     } else {
         frame->tag       = 0; /* This value is reserved when tag is present, so
                                * it can be used to test the absence of tag
                                */
-        frame->ethertype = hd->ethertype;
+        frame->ethertype = htos16(hd->ethertype);
         data             = buffer + sizeof(struct ethII_header);
     }
 
@@ -191,15 +195,15 @@ ethernet_error_t decode_frame(char* buffer, size_t size, struct eth_frame* frame
     if(frame->ethertype >= 1536) { /* Ethernet II frame, ie DIX ethernet */
         frame->size = size - (data - buffer) - 4;
         frame->data = data;
-        frame->crc  = *crc;
+        frame->crc  = htos32(*crc);
         return check_crc(buffer, size - 4, frame->crc);
     }
     
     else if(frame->ethertype <= 1500) {
         /* Novel Raw IPX */
         if(llc->dsap == 0xFF && llc->ssap == 0xFF) {
-            frame->size      = frame->ethertype;
-            frame->crc       = *crc;
+            frame->size      = htos16(frame->ethertype);
+            frame->crc       = htos32(*crc);
             frame->data      = data;
             frame->ethertype = 0x8137; /* IPX ethertype */
         }
