@@ -1,5 +1,6 @@
 
 #include "arp.h"
+#include "endian.h"
 #include <string.h>
 #include <assert.h>
 
@@ -15,11 +16,11 @@ size_t make_request(const struct arp_params* prms, void* prcv, void* buffer, siz
     char* data = buffer + prms->hlen + sizeof(struct arp_request_header);
     memcpy(buffer, prms->broadcast, prms->hlen);
 
-    hd->htype = prms->htype;
-    hd->ptype = prms->ptype;
+    hd->htype = stoh16(prms->htype);
+    hd->ptype = stoh16(prms->ptype);
     hd->hlen  = prms->hlen;
     hd->plen  = prms->plen;
-    hd->oper  = 1;
+    hd->oper  = stoh16(1);
 
     memcpy(data, prms->haddr, prms->hlen); data += prms->hlen;
     memcpy(data, prms->paddr, prms->plen); data += prms->plen;
@@ -35,11 +36,11 @@ size_t make_reply(struct arp_params* prms, void* prcv, void* hrcv, void* buffer,
     char* data = buffer + prms->hlen + sizeof(struct arp_request_header);
     memcpy(buffer, hrcv, prms->hlen);
 
-    hd->htype = prms->htype;
-    hd->ptype = prms->ptype;
+    hd->htype = stoh16(prms->htype);
+    hd->ptype = stoh16(prms->ptype);
     hd->hlen  = prms->hlen;
     hd->plen  = prms->plen;
-    hd->oper  = 0;
+    hd->oper  = stoh16(0);
 
     memcpy(data, prms->haddr, prms->hlen); data += prms->hlen;
     memcpy(data, prms->paddr, prms->plen); data += prms->plen;
@@ -72,7 +73,7 @@ int read_pdu(void* buffer, size_t size, struct arp_params* prms, void** prcv, vo
 
     *hrcv = data;
     *prcv = data + prms->hlen;
-    return hd->oper;
+    return htos16(hd->oper);
 }
 
 
