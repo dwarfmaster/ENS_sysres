@@ -2,7 +2,7 @@
 CFLAGS=-Wall -Wextra -g -D_GNU_SOURCE -I../lib
 LDFLAGS=
 CC=gcc
-OBJS=main.o tcp.o protocol.o ../lib/lib.a
+OBJS=main.o tcp.o protocol.o timer.o ../lib/lib.a
 PROG=eth.out
 
 all: $(PROG)
