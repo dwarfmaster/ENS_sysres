@@ -12,7 +12,7 @@ enum Id {
     lvl2_frame,
     lvl3_frame,
     lvl32_frame, /* Data is a level-2 address and the data itself */
-    lvl4_frame,
+    lvl4_frame,  /* Assume data preceded by a level-3 address */
     upper_frame,
     reserved1,
     reserved2,
