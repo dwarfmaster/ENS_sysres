@@ -74,8 +74,10 @@ uint16_t compute_cheksum(char* buffer, size_t size, int ipv6, const char* src, c
 
 int read_frame(char* buffer, size_t size, tcp_frame_t* fr, int ipv6, const char* src, const char* dst) {
     struct tcp_frame_header* hd = (struct tcp_frame_header*)buffer;
+    size_t addr_size = (ipv6 ? 16 : 4);
     assert(sizeof(struct tcp_frame_header) == 20);
-    if(size <= 13 || size <= (size_t)hd->offset * 4) return 0;
+    if(size <= 13 + addr_size || size <= (size_t)hd->offset * 4) return 0;
+    buffer += addr_size;
 
     fr->src_port  = htos16(hd->src_port);
     fr->dst_port  = htos16(hd->dst_port);
@@ -97,8 +99,12 @@ int read_frame(char* buffer, size_t size, tcp_frame_t* fr, int ipv6, const char*
 int build_frame(char* buffer, size_t* size, const tcp_frame_t* fr, size_t datalength,
         int ipv6, const char* src, const char* dst) {
     struct tcp_frame_header* hd = (struct tcp_frame_header*)buffer;
+    size_t addr_size = (ipv6 ? 16 : 4);
     assert(sizeof(struct tcp_frame_header) == 20);
-    if(*size <= 13 || *size <= 20 + datalength) return 0;
+    if(*size <= 13 + addr_size || *size <= 20 + datalength) return 0;
+    memcpy(buffer, src, addr_size);
+    buffer += addr_size;
+
     *size = 20 + datalength;
     memmove(buffer + 20, fr->data, datalength);
 
