@@ -8,7 +8,8 @@
 #include <stdint.h>
 
 enum Id {
-    lvl1_frame = 9, /* Chosen to be the value of device read */
+    lvl1_new = 9,
+    lvl1_frame, /* Chosen to be the value of device read */
     lvl2_frame,
     lvl3_frame,
     lvl32_frame, /* Data is a level-2 address and the data itself */
@@ -21,6 +22,17 @@ enum Id {
     arp_register,
     arp_answer
 };
+
+typedef struct lvl1_new {
+    mach_msg_type_t id_type; /* Only present to contain lvl1_new */
+
+    mach_msg_type_t port_type;
+    mach_port_t port;
+
+    mach_msg_type_t addr_type;
+    size_t addr_len;
+    char addr[];
+} __attribute__ ((__packed__)) lvl1_new_t;
 
 typedef struct arp_register {
     mach_msg_type_t port_type;

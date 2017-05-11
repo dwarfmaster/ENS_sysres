@@ -13,7 +13,7 @@
 struct demuxer_args {
     mach_port_t from_trivfs;
     mach_port_t to_trivfs;
-    const char* dev;
+    struct device dev;
 };
 
 struct lvl32_data {
@@ -23,7 +23,6 @@ struct lvl32_data {
 
 void* demuxer_thread(void* vargs) {
     struct demuxer_args* args = (struct demuxer_args*)vargs;
-    struct device dev;
     struct reserved2_data* rs2data;
     mach_port_t set, tmp;
     kern_return_t ret;
@@ -46,12 +45,7 @@ void* demuxer_thread(void* vargs) {
         exit(EXIT_FAILURE);
     }
 
-    err = open_file_device(&dev, args->dev);
-    if(err != ETH_SUCCESS) {
-        log_variadic("Couldn't open device %s\n", args->dev);
-        exit(EXIT_FAILURE);
-    }
-    ret = mach_port_move_member(mach_task_self(), dev.in, set);
+    ret = mach_port_move_member(mach_task_self(), args->dev.in, set);
     if(ret != KERN_SUCCESS) {
         log_string("Couldn't setup set");
         exit(EXIT_FAILURE);
@@ -94,7 +88,7 @@ void* demuxer_thread(void* vargs) {
             case lvl32_frame:
                 if(locked) continue;
                 lvl32 = (struct lvl32_data*)buffer;
-                frame.src       = dev.mac;
+                frame.src       = args->dev.mac;
                 frame.dst       = lvl32->addr;
                 frame.ethertype = lookup_type(set);
                 frame.size      = tpinfo.size - sizeof(struct mac_address);
@@ -109,7 +103,7 @@ void* demuxer_thread(void* vargs) {
                 tpinfo.id     = lvl2_frame;
                 tpinfo.size   = size;
                 tpinfo.number = 1;
-                send_data(dev.out, &tpinfo, buffer);
+                send_data(args->dev.out, &tpinfo, buffer);
 
                 set = tmp;
                 break;
@@ -132,7 +126,6 @@ int main(int argc, char *argv[]) {
     int pret;
     pthread_t thread;
     struct demuxer_args args;
-    args.dev = "/dev/eth0";
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &args.to_trivfs);
     if(ret != KERN_SUCCESS) {
@@ -146,7 +139,13 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    err = types_init("/servers/ethernet/handlers", args.from_trivfs, args.to_trivfs);
+    err = open_file_device(&args.dev, "/dev/eth0");
+    if(err != ETH_SUCCESS) {
+        log_variadic("Couldn't open device /dev/eth0\n");
+        exit(EXIT_FAILURE);
+    }
+
+    err = types_init("/servers/ethernet/handlers", args.from_trivfs, args.to_trivfs, args.dev.mac);
     if(err != ETH_SUCCESS) {
         log_string("Couldn't init ethertypes map");
         exit(EXIT_FAILURE);

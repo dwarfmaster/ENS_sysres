@@ -27,6 +27,7 @@ static char* type_dir;
 static char* type_buffer;
 static mach_port_t main_in;
 static mach_port_t main_out;
+static struct mac_address mac_addr;
 
 static inline uint8_t hash(uint16_t tp) {
     return tp % 256;
@@ -60,7 +61,8 @@ uint16_t lookup_type(mach_port_t port) {
     return 0;
 }
 
-ethernet_error_t types_init(const char* dir, mach_port_t to_main, mach_port_t from_main) {
+ethernet_error_t types_init(const char* dir, mach_port_t to_main, mach_port_t from_main, 
+        struct mac_address addr) {
     for(int i = 0; i < 256; ++i) opened[i] = NULL;
     size_t len = strlen(dir);
     type_dir = malloc(len);
@@ -78,9 +80,19 @@ ethernet_error_t types_init(const char* dir, mach_port_t to_main, mach_port_t fr
         return ETH_AGAIN;
     }
 
-    main_in = to_main;
+    main_in  = to_main;
     main_out = from_main;
+    mac_addr = addr;
     return ETH_SUCCESS;
+}
+
+void clear_mach_type(mach_msg_type_t* t) {
+    t->msgt_name       = 0;
+    t->msgt_size       = 0;
+    t->msgt_number     = 1;
+    t->msgt_inline     = TRUE;
+    t->msgt_longform   = FALSE;
+    t->msgt_deallocate = FALSE;
 }
 
 ethernet_error_t types_register(uint16_t tp) {
@@ -92,6 +104,7 @@ ethernet_error_t types_register(uint16_t tp) {
     struct reserved2_data* dt = (struct reserved2_data*)buffer;
     struct type_file* tf;
     mach_port_t used;
+    lvl1_new_t* nw = (lvl1_new_t*)buffer;
     
     tf = malloc(sizeof(struct type_file));
     if(!tf) return ETH_AGAIN;
@@ -127,7 +140,19 @@ ethernet_error_t types_register(uint16_t tp) {
         free(tf);
         return ETH_IO;
     }
-    if(!send_port_right(tf->fd, tf->reply)) {
+
+    clear_mach_type(&nw->id_type);
+    nw->id_type.msgt_name = lvl1_new;
+    clear_mach_type(&nw->port_type);
+    nw->port_type.msgt_name = MACH_MSG_TYPE_MAKE_SEND;
+    nw->port_type.msgt_size = sizeof(mach_port_t);
+    nw->port                = tf->reply;
+    clear_mach_type(&nw->addr_type);
+    nw->addr_type.msgt_name = 0; /* We don't care */
+    nw->addr_type.msgt_size = 6 + sizeof(size_t);
+    nw->addr_len            = 6;
+    memcpy(nw->addr, (char*)&mac_addr, 6);
+    if(!send_data_low(tf->fd, 5 + sizeof(lvl1_new_t), buffer)) {
         log_variadic("Couldn't send reply port for %4X\n", tp);
         mach_port_deallocate(mach_task_self(), tf->reply);
         free(tf);

@@ -3,6 +3,7 @@
 #define DEF_ETHERNET_ETHERTYPES
 
 #include "types.h"
+#include "ethernet.h"
 #include <stdint.h>
 #include <hurd.h>
 
@@ -11,7 +12,8 @@ struct reserved2_data {
     uint16_t tp;
 };
 
-ethernet_error_t types_init(const char* dir, mach_port_t to_main, mach_port_t from_main);
+ethernet_error_t types_init(const char* dir, mach_port_t to_main, mach_port_t from_main,
+        struct mac_address addr);
 /* Returns ETH_INVALID if the ethertypes is already registered */
 ethernet_error_t types_register(uint16_t tp);
 /* Assumes data is larger than size by at least 64 bytes */
