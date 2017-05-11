@@ -7,6 +7,10 @@
 #include "logging.h"
 #include "proto.h"
 #include "ports.h"
+#include <hurd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 struct handler {
     uint16_t type;
@@ -86,9 +90,9 @@ void free_handlers() {
 /* TrivFS symbols */
 int trivfs_fstype        = FSTYPE_MISC;
 int trivfs_fsid          = 0;
-int trivfs_allow_open    = 0;
-int trivfs_support_read  = 1;
-int trivfs_support_write = 1;
+int trivfs_allow_open    = O_READ | O_WRITE;
+int trivfs_support_read  = 0;
+int trivfs_support_write = 0;
 int trivfs_support_exec  = 0;
 
 /* Misc necessary trivfs callbacks */
@@ -99,6 +103,7 @@ void trivfs_modify_stat(struct trivfs_protid* cred, io_statbuf_t* st) {
 }
 
 error_t trivfs_S_file_set_size(struct trivfs_protid* cred, off_t size) {
+    log_variadic("1");
     size = size; /* Fix warnings */
     if(!cred) return EOPNOTSUPP;
     else      return 0;
@@ -106,6 +111,7 @@ error_t trivfs_S_file_set_size(struct trivfs_protid* cred, off_t size) {
 
 error_t trivfs_S_io_seek(struct trivfs_protid* cred, mach_port_t reply,
         mach_msg_type_name_t reply_type, off_t offs, int whence, off_t* new_offs) {
+    log_variadic("2");
     reply      = reply;      /* Fix warnings */
     reply_type = reply_type; /* Fix warnings */
     offs       = offs;       /* Fix warnings */
@@ -117,6 +123,7 @@ error_t trivfs_S_io_seek(struct trivfs_protid* cred, mach_port_t reply,
 
 error_t trivfs_S_io_select(struct trivfs_protid* cred, mach_port_t reply,
         mach_msg_type_name_t replytype, int* type, int* tag) {
+    log_variadic("3");
     reply     = reply;     /* Fix warnings */
     replytype = replytype; /* Fix warnings */
     type      = type;      /* Fix warnings */
@@ -127,6 +134,7 @@ error_t trivfs_S_io_select(struct trivfs_protid* cred, mach_port_t reply,
 
 error_t trivfs_S_io_get_openmodes(struct trivfs_protid* cred, mach_port_t reply,
         mach_msg_type_name_t replytype, int* bits) {
+    log_variadic("4");
     reply     = reply;     /* Fix warnings */
     replytype = replytype; /* Fix warnings */
     bits      = bits;      /* Fix warnings */
@@ -136,6 +144,7 @@ error_t trivfs_S_io_get_openmodes(struct trivfs_protid* cred, mach_port_t reply,
 
 error_t trivfs_S_io_set_all_openmodes(struct trivfs_protid* cred, mach_port_t reply,
         mach_msg_type_name_t replytype, int* bits) {
+    log_variadic("5");
     reply     = reply;     /* Fix warnings */
     replytype = replytype; /* Fix warnings */
     bits      = bits;      /* Fix warnings */
@@ -145,6 +154,7 @@ error_t trivfs_S_io_set_all_openmodes(struct trivfs_protid* cred, mach_port_t re
 
 error_t trivfs_S_io_set_some_openmodes(struct trivfs_protid* cred, mach_port_t reply,
         mach_msg_type_name_t replytype, int* bits) {
+    log_variadic("6");
     reply     = reply;     /* Fix warnings */
     replytype = replytype; /* Fix warnings */
     bits      = bits;      /* Fix warnings */
@@ -154,6 +164,7 @@ error_t trivfs_S_io_set_some_openmodes(struct trivfs_protid* cred, mach_port_t r
 
 error_t trivfs_S_io_clear_some_openmodes(struct trivfs_protid* cred, mach_port_t reply,
         mach_msg_type_name_t replytype, int* bits) {
+    log_variadic("7");
     reply     = reply;     /* Fix warnings */
     replytype = replytype; /* Fix warnings */
     bits      = bits;      /* Fix warnings */
@@ -162,6 +173,7 @@ error_t trivfs_S_io_clear_some_openmodes(struct trivfs_protid* cred, mach_port_t
 }
 
 error_t trivfs_goaway(struct trivfs_control* cntl, int flags) {
+    log_variadic("8");
     cntl  = cntl;  /* Fix warnings */
     flags = flags; /* Fix warnings */
     exit(EXIT_SUCCESS);

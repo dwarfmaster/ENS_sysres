@@ -110,7 +110,7 @@ ethernet_error_t types_register(uint16_t tp) {
     if(!tf) return ETH_AGAIN;
 
     sprintf(type_buffer, "%s/%04X", type_dir, tp);
-    tf->fd = file_name_lookup(type_buffer, O_READ | O_WRITE, 0);
+    tf->fd = file_name_lookup(type_buffer, O_READ, 0);
     if(tf->fd == MACH_PORT_NULL) {
         log_variadic("Couldn't open %s\n", type_buffer);
         free(tf);
