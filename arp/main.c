@@ -182,7 +182,7 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     char buf[1 << 12];
     struct handler* handler;
     typeinfo_t tpinfo;
-    void *prcv, *hrcv;
+    char *prcv, *hrcv;
     
     handler = lookup_from_ptype(type);
     if(!handler) {
@@ -195,6 +195,10 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         tpinfo.id     = arp_answer;
         tpinfo.size   = handler->params.plen + handler->params.hlen;
         tpinfo.number = 1;
+        printf("%d.%d.%d.%d -> %02X:%02X:%02X:%02X:%02X:%02X",
+                prcv[0], prcv[1], prcv[2], prcv[3],
+                hrcv[0], hrcv[1], hrcv[2],
+                hrcv[3], hrcv[4], hrcv[5]);
 
         memmove(buf, prcv, handler->params.plen);
         memmove(buf + handler->params.plen, hrcv, handler->params.hlen);
