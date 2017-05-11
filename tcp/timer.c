@@ -84,7 +84,7 @@ void pop(heap_element* heap) {
 uint32_t get_time() {
     time_value_t time;
     host_get_time(mach_host_self(), &time);
-    return time.seconds + time.microseconds * 1000;
+    return time.seconds * 1000 + time.microseconds / 1000;
 }
 
 struct timer_thread_data {
