@@ -8,8 +8,8 @@
 #include <stdint.h>
 
 enum Id {
-    lvl1_new = 9,
-    lvl1_frame, /* Chosen to be the value of device read */
+    lvl1_frame = 9, /* Chosen to be the value of device read */
+    lvl1_new = 42,  /* Big enough not to collide with trivfs msgt_names */
     lvl2_frame,
     lvl3_frame,
     lvl32_frame, /* Data is a level-2 address and the data itself */
