@@ -248,6 +248,8 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
     lvl1_new_t* lvl1    = (lvl1_new_t*)tp;
 
+    log_variadic("msgt_name : %d\n", tp->msgt_name);
+
     switch(tp->msgt_name) {
         case lvl1_new:
             ethernet_port = lvl1->port;
