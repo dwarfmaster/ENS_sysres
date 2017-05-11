@@ -18,6 +18,9 @@ struct handler {
 };
 
 struct handler* handlers;
+char* mac_address;
+size_t mac_addr_len;
+mach_port_t ethernet_port;
 
 void init_handlers() {
     handlers = NULL;
@@ -97,14 +100,14 @@ mig_external mig_routine_t socket_server_routine
 
 // Routines
 
-typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_type_t *outp);
+typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_header_t *outp);
 
 void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
+    outp = outp; /* Fix warnings */
     mach_msg_type_t* tp       = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
     char* data                = (char*)tp + sizeof(mach_msg_type_t);;
     size_t size               = tp->msgt_size * tp->msgt_number;
     uint16_t type             = peek_ptype(data, size);
-    mach_port_t ethernet_port = MACH_PORT_NULL; // TODO receive ethernet port
     char* ha_addr             = NULL;
     char buf[1 << 12];
     struct handler* handler;
@@ -139,8 +142,9 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 }
 
 void arp_query_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
+    outp = outp;
     mach_port_t ethernet_port = MACH_PORT_NULL; // TODO receive ethernet port
-    if(ethernet_port == MACH_PORT_NULL) continue;
+    if(ethernet_port == MACH_PORT_NULL) return;
 
     char buf[1 << 12];
     typeinfo_t tpinfo;
@@ -158,17 +162,24 @@ void arp_query_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 }
 
 void arp_register_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
+    outp = outp; /* prevent warnings */
     mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
     char* data          = (char*)tp + sizeof(mach_msg_type_t);;
-    arp_registe_t* reg  = (arp_register_t*)data;
+    arp_register_t* reg  = (arp_register_t*)data;
     add_handler(reg->type, reg->len, reg->data, reg->port);
 }
 
 static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
-    routine_t routine;
-    mach_msg_type_t tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
+    routine_t routine = NULL;
+    mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
+    lvl1_new_t* lvl1 = (lvl1_new_t*)tp;
+
     switch(tp->msgt_name) {
-        // TODO receive ethernet_port
+        case lvl1_new:
+            ethernet_port = lvl1->port;
+            mac_addr_len  = lvl1->addr_len;
+            memcpy(mac_address, lvl1->addr, mac_addr_len);
+            break;
         
         case lvl2_frame:
             routine = lvl2_frame_r;
@@ -184,7 +195,6 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
         default:
             // Unknown message type in arp
-            routine = NULL;
             if(!trivfs_demuxer(inp, outp))
                 return 0;
     }
@@ -195,7 +205,7 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
 // TODO: return error ?
 int launch_registerer() {
-    error_r err;
+    error_t err;
     mach_port_t bootstrap;
     struct trivfs_control* fsys;
 
