@@ -83,20 +83,90 @@ void free_handlers() {
     }
 }
 
-/*
-mig_external mig_routine_t socket_server_routine
-	(const mach_msg_header_t *InHeadP)
-{
-	int msgh_id;
- 
-	msgh_id = InHeadP->msgh_id - 26000;
- 
-	if ((msgh_id > 15) || (msgh_id < 0))
-		return 0;
- 
-	return socket_server_routines[msgh_id];
+/* TrivFS symbols */
+int trivfs_fstype        = FSTYPE_MISC;
+int trivfs_fsid          = 0;
+int trivfs_allow_open    = 0;
+int trivfs_support_read  = 1;
+int trivfs_support_write = 1;
+int trivfs_support_exec  = 0;
+
+/* Misc necessary trivfs callbacks */
+void trivfs_modify_stat(struct trivfs_protid* cred, io_statbuf_t* st) {
+    cred = cred; /* Fix warnings */
+    st = st; /* Fix warnings */
+    /* Do nothing */
 }
-*/
+
+error_t trivfs_S_file_set_size(struct trivfs_protid* cred, off_t size) {
+    size = size; /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_seek(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t reply_type, off_t offs, int whence, off_t* new_offs) {
+    reply      = reply;      /* Fix warnings */
+    reply_type = reply_type; /* Fix warnings */
+    offs       = offs;       /* Fix warnings */
+    whence     = whence;     /* Fix warnings */
+    new_offs   = new_offs;   /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_select(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* type, int* tag) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    type      = type;      /* Fix warnings */
+    tag       = tag;       /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_get_openmodes(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* bits) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    bits      = bits;      /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_set_all_openmodes(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* bits) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    bits      = bits;      /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_set_some_openmodes(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* bits) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    bits      = bits;      /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_clear_some_openmodes(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* bits) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    bits      = bits;      /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_goaway(struct trivfs_control* cntl, int flags) {
+    cntl  = cntl;  /* Fix warnings */
+    flags = flags; /* Fix warnings */
+    exit(EXIT_SUCCESS);
+    return 0;
+}
 
 // Routines
 
@@ -104,11 +174,11 @@ typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_header_t *outp);
 
 void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp = outp; /* Fix warnings */
-    mach_msg_type_t* tp       = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
-    char* data                = (char*)tp + sizeof(mach_msg_type_t);;
-    size_t size               = tp->msgt_size * tp->msgt_number;
-    uint16_t type             = peek_ptype(data, size);
-    char* ha_addr             = NULL;
+    mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
+    char* data          = (char*)tp + sizeof(mach_msg_type_t);;
+    size_t size         = tp->msgt_size * tp->msgt_number;
+    uint16_t type       = peek_ptype(data, size);
+    char* ha_addr       = NULL;
     char buf[1 << 12];
     struct handler* handler;
     typeinfo_t tpinfo;
@@ -122,8 +192,8 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
     if(read_pdu(data, size, &handler->params, &prcv, &hrcv)) {
         /* ARP answer */
-        tpinfo.id = arp_answer;
-        tpinfo.size = handler->params.plen + handler->params.hlen;
+        tpinfo.id     = arp_answer;
+        tpinfo.size   = handler->params.plen + handler->params.hlen;
         tpinfo.number = 1;
 
         memmove(buf, prcv, handler->params.plen);
@@ -133,7 +203,7 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         /* ARP query */
         if(ha_addr == NULL) return; // WUT ?
         if(memcmp(prcv, handler->addr, handler->addr_len) != 0) return;
-        size = make_reply(&handler->params, prcv, ha_addr, buf, 4096);
+        size          = make_reply(&handler->params, prcv, ha_addr, buf, 4096);
         tpinfo.id     = lvl32_frame;
         tpinfo.size   = size;
         tpinfo.number = 1;
@@ -142,7 +212,7 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 }
 
 void arp_query_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
-    outp = outp;
+    outp                      = outp;
     mach_port_t ethernet_port = MACH_PORT_NULL; // TODO receive ethernet port
     if(ethernet_port == MACH_PORT_NULL) return;
 
@@ -162,17 +232,17 @@ void arp_query_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 }
 
 void arp_register_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
-    outp = outp; /* prevent warnings */
+    outp                = outp; /* prevent warnings */
     mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
     char* data          = (char*)tp + sizeof(mach_msg_type_t);;
-    arp_register_t* reg  = (arp_register_t*)data;
+    arp_register_t* reg = (arp_register_t*)data;
     add_handler(reg->type, reg->len, reg->data, reg->port);
 }
 
 static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
-    routine_t routine = NULL;
+    routine_t routine   = NULL;
     mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
-    lvl1_new_t* lvl1 = (lvl1_new_t*)tp;
+    lvl1_new_t* lvl1    = (lvl1_new_t*)tp;
 
     switch(tp->msgt_name) {
         case lvl1_new:
@@ -203,46 +273,29 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     return 1;
 }
 
-// TODO: return error ?
-int launch_registerer() {
+int main(int argc, char *argv[]) {
     error_t err;
     mach_port_t bootstrap;
     struct trivfs_control* fsys;
 
+    init_handlers();
+
+    /* TODO parse arguments */
+
     task_get_bootstrap_port(mach_task_self(), &bootstrap);
     if(bootstrap == MACH_PORT_NULL) {
         log_string("Must be started as a translator");
-        return 0; // INVALID
+        return 1; // INVALID
     }
 
     err = trivfs_startup(bootstrap, 0, 0, 0, 0, 0, &fsys);
     if(err) {
         log_string("Couldn't setup translator");
-        return 0; // IO
+        return 1; // IO
     }
 
     ports_manage_port_operations_multithread(fsys->pi.bucket,
             arp_demuxer, 0, 0, 0);
-    return 1; // SUCCESS
-}
-
-int main(int argc, char *argv[]) {
-    init_handlers();
-
-    /* TODO parse arguments */
-
-    // TODO Useless now ?
-    //kern_return_t ret;
-    //mach_port_t fs_port;
-    //ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &fs_port);
-    //if(ret != KERN_SUCCESS) {
-    //    log_string("Couldn't allocate fs port");
-    //    exit(EXIT_FAILURE);
-    //}
-
-    /* TODO attach to filesystem */
-
-    launch_registerer();
-    return 0;
+    return 0; // SUCCESS
 }
 
