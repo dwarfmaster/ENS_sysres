@@ -2,6 +2,7 @@
 #include "timer.h"
 #include "ports.h"
 #include <pthread.h>
+#include <stdio.h>
 
 #define TIMER_HEAP_SIZE 1024
 #define parent(i) ((i)/2)
@@ -104,11 +105,13 @@ void* timer_thread_main(void* data) {
 
     for(;;) {
         mach_msg_timeout_t timeout = MACH_MSG_TIMEOUT_NONE;
+        mach_msg_option_t  option  = MACH_RCV_MSG;
         if(!empty(heap)) {
             uint32_t time = get_time();
             /* If it should already have been sent, do it now */
             if(heap[1].end_time < time) goto send_timeout;
             timeout = heap[1].end_time - time;
+            option |= MACH_RCV_TIMEOUT;
         }
 
         mach_port_t in = ports->in;
@@ -116,26 +119,27 @@ void* timer_thread_main(void* data) {
         if(full(heap)) in = MACH_PORT_NULL;
 
         hd->msgh_size = 1024;
-        ret = mach_msg(hd, MACH_RCV_TIMEOUT,
+        ret = mach_msg(hd, option,
                 0, 1024, in,
                 timeout, MACH_PORT_NULL);
-        if(ret == MACH_RCV_TIMED_OUT) goto send_timeout;
-        if(ret != MACH_MSG_SUCCESS) continue;
-
-        /* Add new timer */
-        push(heap, *msg);
-        continue;
+        if(ret == MACH_MSG_SUCCESS) {
+            /* Add new timer */
+            push(heap, *msg);
+            continue;
+        }
+        else if(ret != MACH_RCV_TIMED_OUT) continue;
 
 send_timeout:
-        tpinfo.id     = 0;
-        tpinfo.size   = sizeof(timer_message_t);
-        tpinfo.number = 1;
-        out->port = heap[1].port;
-        out->data = heap[1].data;
-        /* Try sending until it succeeds
-         * TODO : make a failure count to prevent infinite loop
-         */
-        if(!send_data(ports->out, &tpinfo, buffer)) goto send_timeout;
+        do {
+            tpinfo.id     = 0;
+            tpinfo.size   = sizeof(timer_message_t);
+            tpinfo.number = 1;
+            out->port = heap[1].port;
+            out->data = heap[1].data;
+            /* Try sending until it succeeds
+             * TODO : make a failure count to prevent infinite loop
+             */
+        } while(!send_data(ports->out, &tpinfo, buffer));
         pop(heap);
     }
 
