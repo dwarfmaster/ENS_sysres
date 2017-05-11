@@ -25,7 +25,7 @@ void* demuxer_thread(void* vargs) {
     struct demuxer_args* args = (struct demuxer_args*)vargs;
     struct device dev;
     struct reserved2_data* rs2data;
-    mach_port_t set, set2, tmp;
+    mach_port_t set, tmp;
     kern_return_t ret;
     ethernet_error_t err;
     char buffer[4096];
@@ -33,6 +33,7 @@ void* demuxer_thread(void* vargs) {
     typeinfo_t tpinfo;
     struct eth_frame frame;
     struct lvl32_data* lvl32;
+    int locked;
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_PORT_SET, &set);
     if(ret != KERN_SUCCESS) {
@@ -56,7 +57,7 @@ void* demuxer_thread(void* vargs) {
         exit(EXIT_FAILURE);
     }
 
-    set2 = args->from_trivfs;
+    locked = 0;
     while(1) {
         tmp = set;
         if(!receive_data(&set, &tpinfo, buffer, 4096)) continue;
@@ -64,6 +65,7 @@ void* demuxer_thread(void* vargs) {
         switch(tpinfo.id) {
             /* Data received from device thread */
             case lvl3_frame:
+                if(locked) continue;
                 if(err != ETH_SUCCESS) continue;
                 dispatch(frame.ethertype, tpinfo.size, buffer);
                 set = tmp;
@@ -71,27 +73,26 @@ void* demuxer_thread(void* vargs) {
 
             /* Data received from trivfs indicating lock */
             case reserved1:
-                tmp = set;
-                set = set2;
-                set2 = tmp;
                 /* Acknowledge lock */
                 tpinfo.id = reserved1;
                 tpinfo.size = 0;
                 tpinfo.number = 1;
                 send_data(args->to_trivfs, &tpinfo, buffer);
+                set = tmp;
+                locked = 1;
                 break;
 
             /* Data received from trivfs indicating end of a lock */
             case reserved2:
-                tmp = set;
-                set = set2;
-                set2 = tmp;
                 rs2data = (struct reserved2_data*)buffer;
                 mach_port_move_member(mach_task_self(), rs2data->nport, set);
+                set = tmp;
+                locked = 0;
                 break;
 
             /* Data received from one of the level3 ports */
             case lvl32_frame:
+                if(locked) continue;
                 lvl32 = (struct lvl32_data*)buffer;
                 frame.src       = dev.mac;
                 frame.dst       = lvl32->addr;
