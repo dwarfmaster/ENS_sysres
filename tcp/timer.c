@@ -1,6 +1,7 @@
 
 #include "timer.h"
 #include "ports.h"
+#include <pthread.h>
 
 #define TIMER_HEAP_SIZE 1024
 #define parent(i) ((i)/2)
@@ -11,7 +12,7 @@
 struct timer {
     uint32_t end_time;
     int port;
-    char* data;
+    uintptr_t data;
 };
 typedef struct timer heap_element;
 
@@ -102,24 +103,24 @@ void* timer_thread_main(void* data) {
     timer_message_t* out = (timer_message_t*)buffer;
 
     for(;;) {
-        if(full(heap)) {
-            /* Only timeout : we won't receive timers we can't handle */
-            /* TODO */
-            goto send_timeout;
-        } else {
-            mach_msg_timeout_t timeout = MACH_MSG_TIMEOUT_NONE;
-            if(!empty(heap)) {
-                uint32_t time = get_time();
-                if(heap[1].end_time < time) goto send_timeout;
-                timeout = heap[1].end_time - time;
-            }
-            hd->msgh_size = 1024;
-            ret = mach_msg(hd, MACH_RCV_TIMEOUT,
-                    0, 1024, ports->in,
-                    timeout, MACH_PORT_NULL);
-            if(ret == MACH_RCV_TIMED_OUT) goto send_timeout;
-            if(ret != MACH_MSG_SUCCESS) continue;
+        mach_msg_timeout_t timeout = MACH_MSG_TIMEOUT_NONE;
+        if(!empty(heap)) {
+            uint32_t time = get_time();
+            /* If it should already have been sent, do it now */
+            if(heap[1].end_time < time) goto send_timeout;
+            timeout = heap[1].end_time - time;
         }
+
+        mach_port_t in = ports->in;
+        /* If the heap is full, do not accept any more incoming requests */
+        if(full(heap)) in = MACH_PORT_NULL;
+
+        hd->msgh_size = 1024;
+        ret = mach_msg(hd, MACH_RCV_TIMEOUT,
+                0, 1024, in,
+                timeout, MACH_PORT_NULL);
+        if(ret == MACH_RCV_TIMED_OUT) goto send_timeout;
+        if(ret != MACH_MSG_SUCCESS) continue;
 
         /* Add new timer */
         push(heap, *msg);
@@ -131,17 +132,55 @@ send_timeout:
         tpinfo.number = 1;
         out->port = heap[1].port;
         out->data = heap[1].data;
+        /* Try sending until it succeeds
+         * TODO : make a failure count to prevent infinite loop
+         */
         if(!send_data(ports->out, &tpinfo, buffer)) goto send_timeout;
+        pop(heap);
     }
 
     return NULL;
 }
 
 tcp_timer_t start_timer_thread(mach_port_t port) {
-    /* TODO */
+    mach_port_t in;
+    struct timer_thread_data* thdata;
+    pthread_t thread;
+    kern_return_t ret;
+    int pret;
+
+    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &in);
+    if(ret != KERN_SUCCESS) return MACH_PORT_NULL;
+
+    thdata = malloc(sizeof(struct timer_thread_data));
+    if(!thdata) {
+        mach_port_deallocate(mach_task_self(), in);
+        return MACH_PORT_NULL;
+    }
+    thdata->in = in;
+    thdata->out = port;
+
+    pret = pthread_create(&thread, NULL, timer_thread_main, (void*)thdata);
+    if(pret) {
+        mach_port_deallocate(mach_task_self(), in);
+        free(thdata);
+        return MACH_PORT_NULL;
+    }
+
+    return in;
 }
 
-void add_timer(tcp_timer_t timer, uint32_t duration, int port, uintptr_t* data) {
-    /* TODO */
+void add_timer(tcp_timer_t timer, uint32_t duration, int port, uintptr_t data) {
+    typeinfo_t tpinfo;
+    char buffer[256];
+    struct timer* msg = (struct timer*)buffer;
+
+    msg->end_time = get_time() + duration;
+    msg->port     = port;
+    msg->data     = data;
+    tpinfo.id     = 0;
+    tpinfo.size   = sizeof(struct timer);
+    tpinfo.number = 1;
+    send_data(timer, &tpinfo, buffer);
 }
 
