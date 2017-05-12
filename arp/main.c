@@ -22,7 +22,7 @@ struct handler {
 };
 
 struct handler* handlers;
-char* mac_address;
+char* mac_address = NULL;
 size_t mac_addr_len;
 mach_port_t ethernet_port;
 
@@ -266,6 +266,12 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         case lvl1_new:
             ethernet_port = lvl1->port;
             mac_addr_len  = lvl1->addr_len;
+            if(mac_address != NULL) free(mac_address);
+            mac_address = malloc(mac_addr_len);
+            if(mac_address == NULL) {
+                log_variadic("Couldn't allocate mac address of size : %d\n", (int)mac_addr_len);
+                return 0;
+            }
             memcpy(mac_address, lvl1->addr, mac_addr_len);
             break;
         
