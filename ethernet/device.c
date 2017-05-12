@@ -40,7 +40,7 @@ void* file_device_main(void* data) {
         used = params->set;
         if(!receive_data_low(&used, &hd, buffer, 4096)) continue;
 
-        switch(tpinfo.id) {
+        switch(hd->msgh_id) {
             case lvl1_frame:
                 net_msg       = (struct net_rcv_msg*)hd;
                 tpinfo.size   = net_msg->packet_type.msgt_size * net_msg->packet_type.msgt_number;
@@ -56,7 +56,7 @@ void* file_device_main(void* data) {
                 break;
 
             default:
-                log_variadic("Device thread received invalid type id : %d\n", tpinfo.id);
+                log_variadic("Device thread received invalid type id : %d\n", hd->msgh_id);
                 break;
         }
     }
