@@ -38,13 +38,14 @@ void message_listen(tcp_connection_t* sock, char* msg, size_t size) {
     if(fr.flags.ack) return;
     if(fr.flags.syn) {
         clean_frame(&rsp);
-        rsp.src_port  = sock->local_port;
-        rsp.dst_port  = sock->remote_port;
-        rsp.ack       = fr.seq;
-        rsp.seq       = fr.seq + 1;
-        rsp.flags.ack = 1;
-        rsp.flags.syn = 1;
-        size          = 2048;
+        rsp.src_port      = sock->local_port;
+        rsp.dst_port      = sock->remote_port;
+        rsp.ack           = fr.seq;
+        rsp.seq           = fr.seq + 1;
+        rsp.flags.ack     = 1;
+        rsp.flags.syn     = 1;
+        size              = 2048;
+        sock->receive_seq = fr.seq;
         if(!build_frame(msg, &size, &rsp, 0, sock->ipv6, sock->local_addr, sock->remote_addr)) return;
         
         tpinfo.id     = lvl4_frame;
@@ -78,13 +79,14 @@ void message_syn_sent(tcp_connection_t* sock, char* msg, size_t size) {
 
     if(fr.flags.syn && !fr.flags.ack) {
         clean_frame(&rsp);
-        rsp.src_port  = sock->local_port;
-        rsp.dst_port  = sock->remote_port;
-        rsp.ack       = fr.seq;
-        rsp.seq       = fr.seq + 1;
-        rsp.flags.ack = 1;
-        rsp.flags.syn = 1;
-        size          = 2048;
+        rsp.src_port      = sock->local_port;
+        rsp.dst_port      = sock->remote_port;
+        rsp.ack           = fr.seq;
+        rsp.seq           = fr.seq + 1;
+        rsp.flags.ack     = 1;
+        rsp.flags.syn     = 1;
+        size              = 2048;
+        sock->receive_seq = fr.seq;
         if(!build_frame(msg, &size, &rsp, 0, sock->ipv6, sock->local_addr, sock->remote_addr)) return;
         
         tpinfo.id     = lvl4_frame;
@@ -97,11 +99,12 @@ void message_syn_sent(tcp_connection_t* sock, char* msg, size_t size) {
 
     if(fr.flags.syn && fr.flags.ack) {
         clean_frame(&rsp);
-        rsp.src_port  = sock->local_port;
-        rsp.dst_port  = sock->remote_port;
-        rsp.ack       = fr.seq;
-        rsp.flags.ack = 1;
-        size          = 2048;
+        rsp.src_port      = sock->local_port;
+        rsp.dst_port      = sock->remote_port;
+        rsp.ack           = fr.seq;
+        rsp.flags.ack     = 1;
+        size              = 2048;
+        sock->receive_seq = fr.seq;
         if(!build_frame(msg, &size, &rsp, 0, sock->ipv6, sock->local_addr, sock->remote_addr)) return;
         
         tpinfo.id     = lvl4_frame;
@@ -232,7 +235,7 @@ void message_established(tcp_connection_t* sock, char* msg, size_t size) {
             size = size_data - size;
             memcpy(sock->receive_buffer, fr.data + offset, size);
         }
-        /* TODO Add timer for ack of 30s */
+        sock->must_ack = 1;
     }
 }
 
@@ -259,6 +262,42 @@ void message(tcp_connection_t* sock, char* msg, size_t size) {
  ******************************************************************************/
 
 void end_timer(tcp_connection_t* sock, uintptr_t data) {
-    /* TODO */
+    size_t i, size;
+    tcp_frame_t rsp;
+    char msg[1024];
+    typeinfo_t tpinfo;
+
+    if(!sock->history[data].used) return;
+    
+    switch(sock->history[data].action) {
+        case TIMER_CLOSE:
+            if(sock->state != TIME_WAIT) break;
+            sock->state = CLOSED;
+            for(i = 0; i < TCP_SENT_HISTORY_SIZE; ++i) {
+                sock->history[i].used = 0;
+            }
+            sock->sent_size = sock->receive_size = 0;
+            break;
+
+        case TIMER_ACK:
+            if(sock->state != ESTABLISHED || !sock->must_ack) break;
+            sock->must_ack = 0;
+
+            clean_frame(&rsp);
+            rsp.src_port      = sock->local_port;
+            rsp.dst_port      = sock->remote_port;
+            rsp.ack           = sock->receive_seq;
+            rsp.flags.ack     = 1;
+            size              = 2048;
+            if(!build_frame(msg, &size, &rsp, 0, sock->ipv6, sock->local_addr, sock->remote_addr)) return;
+            
+            tpinfo.id     = lvl4_frame;
+            tpinfo.size   = size;
+            tpinfo.number = 1;
+            send_data(sock->ip_conn, &tpinfo, msg);
+            break;
+        /* TODO */
+    }
+    sock->history[data].size = 0;
 }
 

@@ -25,9 +25,18 @@ typedef enum tcp_state {
 } tcp_state_t;
 
 #define TCP_SENT_HISTORY_SIZE 30
+enum tcp_timer_action {
+    TIMER_CLOSE,          /* TIME_WAIT         -> CLOSED       */
+    TIMER_ACK,            /* ESTABLISHED       -> ESTABLISHED  */
+    TIMER_RESEND_DATA,    /* ESTABLISHED       -> ESTABLISHED  */
+    TIMER_RESEND_ACK_SYN, /* LISTEN | SYN_SENT -> SYN_RECEIVED */
+    TIMER_RESEND_ACK      /* SYN_SENT          -> ESTABLISHED  */
+};
 struct tcp_sent {
+    enum tcp_timer_action action;
     uint32_t seq;
     uint32_t size;
+    int used;
 };
 
 typedef struct tcp_connection {
@@ -47,6 +56,7 @@ typedef struct tcp_connection {
 
     uint32_t receive_seq;
     uint32_t receive_size;
+    int must_ack;
     char receive_buffer[TCP_BUFFER_SIZE];
 } tcp_connection_t;
 
