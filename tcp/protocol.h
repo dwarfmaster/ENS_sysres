@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <hurd.h>
+#include "timer.h"
 
 typedef enum tcp_state {
     CLOSED,
@@ -23,6 +24,12 @@ typedef enum tcp_state {
     NUMBER_STATE
 } tcp_state_t;
 
+#define TCP_SENT_HISTORY_SIZE 30
+struct tcp_sent {
+    uint32_t seq;
+    uint32_t size;
+};
+
 typedef struct tcp_connection {
     uint16_t local_port, remote_port;
     char *local_addr, *remote_addr;
@@ -30,12 +37,21 @@ typedef struct tcp_connection {
     int ipv6;
     pthread_t thread;
     mach_port_t ip_conn;
+    tcp_timer_t timer;
 
+    struct tcp_sent history[TCP_SENT_HISTORY_SIZE];
+    uint32_t send_seq;
+    uint32_t sent_size;
+    uint32_t remote_window;
     char send_buffer[TCP_BUFFER_SIZE];
+
+    uint32_t receive_seq;
+    uint32_t receive_size;
     char receive_buffer[TCP_BUFFER_SIZE];
 } tcp_connection_t;
 
 void message(tcp_connection_t* sock, char* msg, size_t size);
+void end_timer(tcp_connection_t* sock, uintptr_t data);
 /* TODO socket interface */
 
 #endif//DEF_TCP_PROTOCOL
