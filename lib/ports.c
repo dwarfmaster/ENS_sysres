@@ -7,7 +7,7 @@ struct message_full_header {
     mach_msg_type_t type;
 };
 
-int send_data_low(mach_port_t port, size_t size, char* data) {
+int send_data_low(mach_port_t port, size_t size, char* data, int id) {
     mach_msg_return_t err;
     mach_msg_header_t* hd = (mach_msg_header_t*)data;
     memmove(data + sizeof(mach_msg_header_t), data, size);
@@ -19,6 +19,7 @@ int send_data_low(mach_port_t port, size_t size, char* data) {
     hd->msgh_size = ((hd->msgh_size + 3) >> 2) << 2;
     hd->msgh_local_port = MACH_PORT_NULL;
     hd->msgh_remote_port = port;
+    hd->msgh_id = id;
 
     err = mach_msg( hd, MACH_SEND_MSG,
             hd->msgh_size, 0, MACH_PORT_NULL,
@@ -38,8 +39,9 @@ int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
     hd->head.msgh_size = size + sizeof(struct message_full_header);
     hd->head.msgh_local_port = MACH_PORT_NULL;
     hd->head.msgh_remote_port = port;
+    hd->head.msgh_id = info->id;
 
-    hd->type.msgt_name = info->id;
+    hd->type.msgt_name = MACH_MSG_TYPE_UNSTRUCTURED;
     hd->type.msgt_size = info->size * 8;
     hd->type.msgt_number = info->number;
     hd->type.msgt_inline = TRUE;
@@ -73,7 +75,7 @@ int receive_data(mach_port_t* port, typeinfo_t* info, char* buffer, size_t size)
     struct message_full_header* hd;
     if(!receive_data_low(port, (mach_msg_header_t**)&hd, buffer, size)) return 0;
 
-    info->id     = hd->type.msgt_name;
+    info->id     = hd->head.msgh_id;
     info->size   = hd->type.msgt_size / 8;
     info->number = hd->type.msgt_number;
     memmove(buffer, buffer + sizeof(struct message_full_header), info->size * info->number);

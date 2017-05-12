@@ -148,11 +148,11 @@ ethernet_error_t types_register(uint16_t tp) {
     nw->port_type.msgt_size = sizeof(mach_port_t);
     nw->port                = tf->reply;
     clear_mach_type(&nw->addr_type);
-    nw->addr_type.msgt_name = 0; /* We don't care */
+    nw->addr_type.msgt_name = MACH_MSG_TYPE_UNSTRUCTURED;
     nw->addr_type.msgt_size = 6 + sizeof(size_t);
     nw->addr_len            = 6;
     memcpy(nw->addr, (char*)&mac_addr, 6);
-    if(!send_data_low(tf->fd, 5 + sizeof(lvl1_new_t), buffer)) {
+    if(!send_data_low(tf->fd, 5 + sizeof(lvl1_new_t), buffer, 0)) {
         log_variadic("Couldn't send reply port for %4X\n", tp);
         mach_port_deallocate(mach_task_self(), tf->reply);
         free(tf);

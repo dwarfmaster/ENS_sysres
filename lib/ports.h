@@ -23,7 +23,7 @@ typedef struct typeinfo {
  */
 int send_data(mach_port_t port, const typeinfo_t* info, char* data);
 /* Send data of size size. The type header must already be included */
-int send_data_low(mach_port_t port, size_t size, char* data);
+int send_data_low(mach_port_t port, size_t size, char* data, int id);
 /* info is only set, not read here
  * If port is a port set, it is set to the real port from which the data came
  */
