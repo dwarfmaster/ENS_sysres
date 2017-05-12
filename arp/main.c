@@ -202,7 +202,7 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         return;
     }
 
-    if(read_pdu(data, size, &handler->params, &prcv, &hrcv)) {
+    if(read_pdu(data, size, &handler->params, (void**)&prcv, (void**)&hrcv)) {
         /* ARP answer */
         tpinfo.id     = arp_answer;
         tpinfo.size   = handler->params.plen + handler->params.hlen;
@@ -297,7 +297,7 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     return 1;
 }
 
-int main(int argc, char *argv[]) {
+int main() {
     error_t err;
     mach_port_t bootstrap;
     struct trivfs_control* fsys;
