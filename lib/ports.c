@@ -37,6 +37,7 @@ int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
     hd->head.msgh_bits = MACH_MSGH_BITS_REMOTE(
             MACH_MSG_TYPE_MAKE_SEND);
     hd->head.msgh_size = size + sizeof(struct message_full_header);
+    hd->head.msgh_size = ((hd->head.msgh_size + 3) >> 2) << 2;
     hd->head.msgh_local_port = MACH_PORT_NULL;
     hd->head.msgh_remote_port = port;
     hd->head.msgh_id = info->id;
