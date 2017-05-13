@@ -72,6 +72,8 @@ error_t sock_connect(tcp_connection_t* sock, char* laddr, int lport,
         char* raddr, int rport);
 error_t sock_bind(tcp_connection_t* sock, char* laddr, int lport);
 error_t sock_shutdown(tcp_connection_t* sock);
+error_t sock_send(tcp_connection_t* sock, char* data, size_t datalen);
+error_t sock_receive(tcp_connection_t* sock, char* data, size_t* data_size);
 
 #endif//DEF_TCP_PROTOCOL
 

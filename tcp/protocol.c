@@ -260,6 +260,7 @@ void message_established(tcp_connection_t* sock, char* msg, size_t size) {
     }
 
     /* Receive data */
+    sock->remote_window = fr.window;
     /* Can we receive this data ? */
     if(fr.seq + size_data - sock->receive_seq >= TCP_BUFFER_SIZE) return;
 
@@ -557,3 +558,28 @@ error_t sock_send(tcp_connection_t* sock, char* data, size_t datalen) {
 
     return 0;
 }
+
+error_t sock_receive(tcp_connection_t* sock, char* data, size_t* data_size) {
+    if(!sock || sock->state != ESTABLISHED) {
+        return EOPNOTSUPP;
+    }
+
+    size_t used_size = MIN(*data_size, sock->receive_size);
+    uint32_t offset = sock->receive_seq % TCP_BUFFER_SIZE;
+    *data_size = used_size;
+
+    if(used_size == 0) return 0;
+
+    if(offset + used_size <= TCP_BUFFER_SIZE) {
+        memcpy(data, sock->receive_buffer + offset, used_size);
+    } else {
+        memcpy(data, sock->receive_buffer + offset, TCP_BUFFER_SIZE - offset);
+        offset = TCP_BUFFER_SIZE - offset;
+        memcpy(data + offset, sock->receive_buffer, used_size - offset);
+    }
+    sock->receive_seq  += used_size;
+    sock->receive_size -= used_size;
+
+    return 0;
+}
+
