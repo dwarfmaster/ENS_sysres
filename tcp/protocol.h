@@ -43,7 +43,6 @@ typedef struct tcp_connection {
     char *local_addr, *remote_addr;
     tcp_state_t state;
     int ipv6;
-    pthread_t thread;
     mach_port_t ip_conn;
     tcp_timer_t timer;
 
@@ -62,7 +61,14 @@ typedef struct tcp_connection {
 
 void message(tcp_connection_t* sock, char* msg, size_t size);
 void end_timer(tcp_connection_t* sock, uintptr_t data);
-/* TODO socket interface */
+/* Socket interface */
+error_t sock_create(tcp_connection_t** sock, tcp_timer_t timer, mach_port_t ip);
+error_t sock_listen(tcp_connection_t* sock, int qlimit);
+error_t sock_accept(tcp_connection_t* sock);
+error_t sock_connect(tcp_connection_t* sock, char* laddr, int lport,
+        char* raddr, int rport);
+error_t sock_bind(tcp_connection_t* sock, char* laddr, int lport);
+error_t sock_shutdown(tcp_connection_t* sock);
 
 #endif//DEF_TCP_PROTOCOL
 

@@ -5,6 +5,8 @@
 #include "ports.h"
 #include <string.h>
 
+#define IP_ADDR_LEN 4
+
 void tcp_add_timer(tcp_connection_t* sock, uint32_t duration,
         enum tcp_timer_action action,
         uint32_t seq, uint32_t size,
@@ -26,8 +28,8 @@ void reset(tcp_connection_t* sock) {
     size_t i;
 
     sock->local_port = sock->remote_port = 0;
-    free(sock->local_addr);
-    free(sock->remote_addr);
+    if(sock->local_addr)  free(sock->local_addr);
+    if(sock->remote_addr) free(sock->remote_addr);
     sock->local_addr = sock->remote_addr = NULL;
 
     sock->send_seq = sock->sent_size = 0;
@@ -358,5 +360,133 @@ void end_timer(tcp_connection_t* sock, uintptr_t data) {
             return;
     }
     sock->history[data].used = 0;
+}
+
+/******************************************************************************
+ ************************ Socket interface ************************************
+ ******************************************************************************/
+
+error_t sock_create(tcp_connection_t** sock, tcp_timer_t timer, mach_port_t ip) {
+    tcp_connection_t* new = malloc(sizeof(tcp_connection_t));
+    if(!new) return ENOMEM;
+    reset(new);
+    /* Only handle IPv4 for now */
+    new->ipv6  = 0;
+    new->timer = timer;
+    new->ip_conn = ip;
+    *sock = new;
+    return 0;
+}
+
+error_t sock_listen(tcp_connection_t* sock, int qlimit) {
+    if(!sock || sock->state != CLOSED) {
+        return EOPNOTSUPP;
+    }
+
+    /* TODO change listen semantics to handle accept requests */
+    sock->state = LISTEN;
+    return 0;
+}
+
+error_t sock_accept(tcp_connection_t* sock) {
+    /* TODO see listen */
+    return EOPNOTSUPP;
+}
+
+error_t sock_connect(tcp_connection_t* sock, char* laddr, int lport,
+        char* raddr, int rport) {
+    char msg[2048];
+    typeinfo_t tpinfo;
+    tcp_frame_t rsp;
+    size_t size;
+    if(!sock || sock->state != CLOSED) {
+        return EOPNOTSUPP;
+    }
+
+    sock->local_addr = malloc(IP_ADDR_LEN);
+    if(!sock->local_addr) {
+        return ENOMEM;
+    }
+    memcpy(sock->local_addr, laddr, IP_ADDR_LEN);
+    sock->local_port = lport;
+
+    sock->remote_addr = malloc(IP_ADDR_LEN);
+    if(!sock->remote_addr) {
+        reset(sock);
+        return ENOMEM;
+    }
+    memcpy(sock->remote_addr, raddr, IP_ADDR_LEN);
+    sock->remote_port = rport;
+
+    clean_frame(&rsp);
+    rsp.src_port      = sock->local_port;
+    rsp.dst_port      = sock->remote_port;
+    rsp.seq           = 0;
+    rsp.flags.syn     = 1;
+    size              = 2048;
+    if(!build_frame(msg, &size, &rsp, 0, sock->ipv6,
+                sock->local_addr, sock->remote_addr)) return EAGAIN;
+    
+    tpinfo.id     = lvl4_frame;
+    tpinfo.size   = size;
+    tpinfo.number = 1;
+    send_data(sock->ip_conn, &tpinfo, msg);
+    /* TODO add TIMER_RESEND_SYN */
+    sock->state = SYN_SENT;
+
+    return 0;
+}
+
+error_t sock_bind(tcp_connection_t* sock, char* laddr, int lport) {
+    if(!sock || sock->state != CLOSED) {
+        return EOPNOTSUPP;
+    }
+
+    sock->local_addr = malloc(IP_ADDR_LEN);
+    if(!sock->local_addr) {
+        return ENOMEM;
+    }
+    memcpy(sock->local_addr, laddr, IP_ADDR_LEN);
+    sock->local_port = lport;
+
+    return 0;
+}
+
+error_t sock_shutdown(tcp_connection_t* sock) {
+    char msg[2048];
+    typeinfo_t tpinfo;
+    tcp_frame_t rsp;
+    size_t size;
+    if(!sock) return EOPNOTSUPP;
+
+    switch(sock->state) {
+        case LISTEN:
+        case SYN_SENT:
+            reset(sock);
+            break;
+
+        case CLOSE_WAIT:
+            sock->state = LAST_ACK;
+        case SYN_RECEIVED:
+            clean_frame(&rsp);
+            rsp.src_port      = sock->local_port;
+            rsp.dst_port      = sock->remote_port;
+            rsp.flags.fin     = 1;
+            size              = 2048;
+            if(!build_frame(msg, &size, &rsp, 0, sock->ipv6,
+                        sock->local_addr, sock->remote_addr)) return EAGAIN;
+            
+            tpinfo.id     = lvl4_frame;
+            tpinfo.size   = size;
+            tpinfo.number = 1;
+            send_data(sock->ip_conn, &tpinfo, msg);
+            /* TODO add resend fin timer */
+            if(sock->state != LAST_ACK) sock->state = FIN_WAIT_1;
+            break;
+
+        default:
+            return EOPNOTSUPP;
+    }
+    return 0;
 }
 
