@@ -49,7 +49,10 @@ typedef struct tcp_connection {
     struct tcp_sent history[TCP_SENT_HISTORY_SIZE];
     uint32_t send_seq;
     uint32_t sent_size;
-    /* Add to_send_size */
+    /* This is the size of the while stored data, ie the
+     * already sent size plus the stored yet to send size
+     */
+    uint32_t send_window;
     uint32_t remote_window;
     char send_buffer[TCP_BUFFER_SIZE];
 

@@ -5,7 +5,12 @@
 #include "ports.h"
 #include <string.h>
 
+#define TCP_MAX_DATA 1300
 #define IP_ADDR_LEN 4
+/* TODO update remote window */
+
+/* Assumes X and Y have no side effect */
+#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
 void tcp_add_timer(tcp_connection_t* sock, uint32_t duration,
         enum tcp_timer_action action,
@@ -33,6 +38,7 @@ void reset(tcp_connection_t* sock) {
     sock->local_addr = sock->remote_addr = NULL;
 
     sock->send_seq = sock->sent_size = 0;
+    sock->send_window = 0;
     sock->receive_seq = sock->receive_size = 0;
     sock->must_ack = 0;
 
@@ -271,6 +277,7 @@ void message_established(tcp_connection_t* sock, char* msg, size_t size) {
             memcpy(sock->receive_buffer, fr.data + offset, size);
         }
         sock->must_ack = 1;
+        sock->receive_size = fr.seq + size_data - sock->receive_seq;
         tcp_add_timer(sock, 5000, TIMER_ACK, 0, 0, 1);
     }
 }
@@ -490,3 +497,63 @@ error_t sock_shutdown(tcp_connection_t* sock) {
     return 0;
 }
 
+error_t sock_send(tcp_connection_t* sock, char* data, size_t datalen) {
+    char buffer[2048];
+    tcp_frame_t fr;
+    typeinfo_t tpinfo;
+    size_t datalength, size;
+
+    if(!sock || sock->state != ESTABLISHED) {
+        return EOPNOTSUPP;
+    }
+
+    if(sock->send_window + datalen > TCP_BUFFER_SIZE) {
+        return EAGAIN;
+    }
+
+    size_t offset = (sock->send_seq + sock->send_window) % TCP_BUFFER_SIZE;
+    if(offset + datalen < TCP_BUFFER_SIZE) {
+        memcpy(sock->send_buffer + offset, data, datalen);
+    } else {
+        memcpy(sock->send_buffer + offset, data, TCP_BUFFER_SIZE - offset);
+        offset  = TCP_BUFFER_SIZE - offset;
+        datalen = datalen - offset;
+        memcpy(sock->send_buffer, data + offset, datalen);
+    }
+    sock->send_window += datalen;
+
+    /* Remote window of 0 means paused connection */
+    if(sock->remote_window == 0) return 0;
+
+    /* Add the data and send as much as possible */
+    /* TODO bufferize and wait before sending it all */
+    while(sock->send_window - sock->sent_size > 0) {
+        clean_frame(&fr);
+        fr.src_port  = sock->local_port;
+        fr.dst_port  = sock->remote_port;
+        fr.seq       = sock->send_seq + sock->sent_size;
+        fr.window    = TCP_BUFFER_SIZE - sock->receive_size;
+
+        fr.flags.ack = 1;
+        fr.ack       = sock->receive_seq + sock->receive_size;
+
+        offset       = sock->send_seq % TCP_BUFFER_SIZE;
+        fr.data      = sock->send_buffer + offset;
+        datalength   = MIN(sock->send_window - sock->sent_size, TCP_MAX_DATA);
+        if(offset + datalength > TCP_BUFFER_SIZE) datalength = TCP_BUFFER_SIZE - offset;
+
+        size = 2048;
+        if(!build_frame(buffer, &size, &fr, datalength, sock->ipv6,
+                    sock->local_addr, sock->remote_addr)) break;
+
+        tpinfo.id     = lvl4_frame;
+        tpinfo.size   = size;
+        tpinfo.number = 1;
+        if(!send_data(sock->ip_conn, &tpinfo, buffer)) break;
+
+        sock->must_ack   = 0;
+        sock->sent_size += datalength;
+    }
+
+    return 0;
+}
