@@ -171,7 +171,6 @@ void dispatch(uint16_t tp, uint16_t size, char* data) {
     struct type_file* tf = lookup(tp);
     typeinfo_t tpinfo;
     if(!tf) {
-        log_variadic("Unhandled ethertype %04X\n", tp);
         return;
     }
 
