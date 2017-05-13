@@ -5,6 +5,23 @@
 #include "ports.h"
 #include <string.h>
 
+void tcp_add_timer(tcp_connection_t* sock, uint32_t duration,
+        enum tcp_timer_action action,
+        uint32_t seq, uint32_t size,
+        int used) {
+    size_t i;
+    for(i = 0; i < TCP_SENT_HISTORY_SIZE; ++i) {
+        if(!sock->history[i].used) {
+            sock->history[i].action = action;
+            sock->history[i].seq    = seq;
+            sock->history[i].size   = size;
+            sock->history[i].used   = used;
+            add_timer(sock->timer, duration, sock->local_port, i);
+            return;
+        }
+    }
+}
+
 void reset(tcp_connection_t* sock) {
     size_t i;
 
@@ -66,7 +83,7 @@ void message_listen(tcp_connection_t* sock, char* msg, size_t size) {
         tpinfo.size   = size;
         tpinfo.number = 1;
         send_data(sock->ip_conn, &tpinfo, msg);
-        /* TODO add TIMER_RESEND_ACK_SYN */
+        tcp_add_timer(sock, 200000, TIMER_RESEND_ACK_SYN, 0, 0, 1);
         sock->state   = SYN_RECEIVED;
     }
 }
@@ -109,7 +126,7 @@ void message_syn_sent(tcp_connection_t* sock, char* msg, size_t size) {
         tpinfo.number = 1;
         send_data(sock->ip_conn, &tpinfo, msg);
         sock->state   = SYN_RECEIVED;
-        /* TODO add TIMER_RESEND_ACK_SYN */
+        tcp_add_timer(sock, 200000, TIMER_RESEND_ACK_SYN, 0, 0, 1);
         return;
     }
 
@@ -182,7 +199,7 @@ void message_fin_wait_2(tcp_connection_t* sock, char* msg, size_t size) {
         tpinfo.number = 1;
         send_data(sock->ip_conn, &tpinfo, msg);
         sock->state   = TIME_WAIT;
-        /* TODO add TIMER_CLOSE */
+        tcp_add_timer(sock, 240000, TIMER_CLOSE, 0, 0, 1);
     }
 }
 
@@ -192,7 +209,7 @@ void message_closing(tcp_connection_t* sock, char* msg, size_t size) {
 
     if(fr.flags.ack) {
         sock->state = TIME_WAIT;
-        /* TODO add TIMER_CLOSE */
+        tcp_add_timer(sock, 240000, TIMER_CLOSE, 0, 0, 1);
         return;
     }
 }
@@ -252,7 +269,7 @@ void message_established(tcp_connection_t* sock, char* msg, size_t size) {
             memcpy(sock->receive_buffer, fr.data + offset, size);
         }
         sock->must_ack = 1;
-        /* TODO add TIMER_ACK timer (5s) */
+        tcp_add_timer(sock, 5000, TIMER_ACK, 0, 0, 1);
     }
 }
 
