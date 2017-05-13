@@ -26,11 +26,10 @@ typedef enum tcp_state {
 
 #define TCP_SENT_HISTORY_SIZE 30
 enum tcp_timer_action {
-    TIMER_CLOSE,          /* TIME_WAIT         -> CLOSED       */
-    TIMER_ACK,            /* ESTABLISHED       -> ESTABLISHED  */
-    TIMER_RESEND_DATA,    /* ESTABLISHED       -> ESTABLISHED  */
-    TIMER_RESEND_ACK_SYN, /* LISTEN | SYN_SENT -> SYN_RECEIVED */
-    TIMER_RESEND_ACK      /* SYN_SENT          -> ESTABLISHED  */
+    TIMER_CLOSE,          /* TIME_WAIT    -> CLOSED       */
+    TIMER_ACK,            /* ESTABLISHED  -> ESTABLISHED  */
+    TIMER_RESEND_DATA,    /* ESTABLISHED  -> ESTABLISHED  */
+    TIMER_RESEND_ACK_SYN, /* SYN_RECIEVED -> SYN_RECEIVED */
 };
 struct tcp_sent {
     enum tcp_timer_action action;
@@ -51,6 +50,7 @@ typedef struct tcp_connection {
     struct tcp_sent history[TCP_SENT_HISTORY_SIZE];
     uint32_t send_seq;
     uint32_t sent_size;
+    /* Add to_send_size */
     uint32_t remote_window;
     char send_buffer[TCP_BUFFER_SIZE];
 
