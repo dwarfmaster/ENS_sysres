@@ -45,11 +45,13 @@ void* file_device_main(void* data) {
         switch(hd->msgh_id) {
             case lvl1_frame:
                 net_msg       = (struct net_rcv_msg*)hd;
-                tpinfo.size   = ETH_HEADER_LEN + net_msg->packet_type.msgt_size * net_msg->packet_type.msgt_number;
+                tpinfo.size   = net_msg->packet_type.msgt_size * net_msg->packet_type.msgt_number;
                 tpinfo.number = 1;
                 tpinfo.id     = lvl3_frame;
-                memmove(net_msg->packet - 14, net_msg->header, ETH_HEADER_LEN);
-                send_data(params->out, &tpinfo, net_msg->packet - 14);
+                memmove(buffer, net_msg->header, ETH_HEADER_LEN);
+                memmove(buffer + ETH_HEADER_LEN, net_msg->packet, tpinfo.size);
+                tpinfo.size  += ETH_HEADER_LEN;
+                send_data(params->out, &tpinfo, buffer);
                 break;
 
             case lvl2_frame:
