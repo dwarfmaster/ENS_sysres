@@ -24,8 +24,6 @@ enum Id {
 };
 
 typedef struct lvl1_new {
-    mach_msg_type_t id_type; /* Only present to contain lvl1_new */
-
     mach_msg_type_t port_type;
     mach_port_t port;
 

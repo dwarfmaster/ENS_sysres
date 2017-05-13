@@ -254,7 +254,7 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
     log_variadic("msgh_id : %d\n", inp->msgh_id);
 
-    switch(tp->msgt_name) {
+    switch(inp->msgh_id) {
         case lvl1_new:
             ethernet_port = lvl1->port;
             mac_addr_len  = lvl1->addr_len;
