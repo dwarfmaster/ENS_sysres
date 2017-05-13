@@ -26,6 +26,8 @@ struct file_device_main_data {
     mach_port_t out;
 };
 
+#define ETH_HEADER_LEN 14
+
 void* file_device_main(void* data) {
     char buffer[4096];
     int size, written;
@@ -43,10 +45,11 @@ void* file_device_main(void* data) {
         switch(hd->msgh_id) {
             case lvl1_frame:
                 net_msg       = (struct net_rcv_msg*)hd;
-                tpinfo.size   = net_msg->packet_type.msgt_size * net_msg->packet_type.msgt_number;
+                tpinfo.size   = ETH_HEADER_LEN + net_msg->packet_type.msgt_size * net_msg->packet_type.msgt_number;
                 tpinfo.number = 1;
                 tpinfo.id     = lvl3_frame;
-                send_data(params->out, &tpinfo, net_msg->packet);
+                memmove(net_msg->packet - 14, net_msg->header, ETH_HEADER_LEN);
+                send_data(params->out, &tpinfo, net_msg->packet - 14);
                 break;
 
             case lvl2_frame:

@@ -60,7 +60,9 @@ void* demuxer_thread(void* vargs) {
             /* Data received from device thread */
             case lvl3_frame:
                 if(locked) continue;
+                err = decode_frame(buffer, tpinfo.size * tpinfo.number, &frame);
                 if(err != ETH_SUCCESS) continue;
+                fprintf(stderr, "New frame received of type %04X\n", frame.ethertype);
                 dispatch(frame.ethertype, tpinfo.size, buffer);
                 set = tmp;
                 break;

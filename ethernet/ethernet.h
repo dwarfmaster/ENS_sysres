@@ -37,7 +37,8 @@ ethernet_error_t check_crc(const char* buffer, size_t size, uint32_t crc);
 ethernet_error_t make_frame(struct eth_frame* frame, char* buffer, size_t* size);
 /* The frame is valid only as long as the buffer is.
  * size must be the size of the whole frame (determined by level 1
- * machinery)
+ * machinery) without the checksum.
+ * The checksum is not checked for validity : we assume their is none.
  */
 ethernet_error_t decode_frame(char* buffer, size_t size, struct eth_frame* frame);
 

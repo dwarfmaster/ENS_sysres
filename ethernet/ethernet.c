@@ -174,9 +174,10 @@ ethernet_error_t decode_frame(char* buffer, size_t size, struct eth_frame* frame
     struct ethII_header* hd = (struct ethII_header*)buffer;
     struct ethII_header_tagged* hd_tag = (struct ethII_header_tagged*)buffer;
     char* data = NULL;
-    uint32_t* crc = (uint32_t*)(buffer + size - 4);
-    if(size < 64) return ETH_INVALID;
+    if(size < 14) return ETH_INVALID;
 
+    /* Copy the source and destination buffers */
+    memcpy(frame, buffer, 12);
 
     if(htos16(hd->ethertype) == 0x8100) {
         frame->tag       = htos16(hd_tag->tci);
@@ -193,17 +194,15 @@ ethernet_error_t decode_frame(char* buffer, size_t size, struct eth_frame* frame
 
     struct eth_header_llc* llc = (struct eth_header_llc*)data;
     if(frame->ethertype >= 1536) { /* Ethernet II frame, ie DIX ethernet */
-        frame->size = size - (data - buffer) - 4;
+        frame->size = size - (data - buffer);
         frame->data = data;
-        frame->crc  = htos32(*crc);
-        return check_crc(buffer, size - 4, frame->crc);
+        return ETH_SUCCESS;
     }
     
     else if(frame->ethertype <= 1500) {
         /* Novel Raw IPX */
         if(llc->dsap == 0xFF && llc->ssap == 0xFF) {
             frame->size      = htos16(frame->ethertype);
-            frame->crc       = htos32(*crc);
             frame->data      = data;
             frame->ethertype = 0x8137; /* IPX ethertype */
         }
@@ -221,10 +220,10 @@ ethernet_error_t decode_frame(char* buffer, size_t size, struct eth_frame* frame
             return ETH_INVALID; /* Drop the frame */
         }
 
-        if(frame->size + 4 + (size_t)(data - buffer) != size) {
+        if(frame->size + (size_t)(data - buffer) != size) {
             return ETH_INVALID;
         } else {
-            return check_crc(buffer, size - 4, frame->crc);
+            return ETH_SUCCESS;
         }
     }
     
