@@ -68,8 +68,8 @@ int read_pdu(void* buffer, size_t size, struct arp_params* prms, void** prcv, vo
 
     assert(prms->hlen  == hd->hlen);
     assert(prms->plen  == hd->plen);
-    assert(prms->htype == hd->htype);
-    assert(prms->ptype == hd->ptype);
+    assert(prms->htype == htos16(hd->htype));
+    assert(prms->ptype == htos16(hd->ptype));
 
     *hrcv = data;
     *prcv = data + prms->hlen;
