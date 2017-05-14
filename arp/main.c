@@ -198,7 +198,7 @@ void lvl3_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         /* ARP answer */
         tpinfo.id     = arp_answer;
         tpinfo.size   = handler->params.plen + handler->params.hlen;
-        printf("%d.%d.%d.%d -> %02X:%02X:%02X:%02X:%02X:%02X",
+        fprintf(stderr, "%hhu.%hhu.%hhu.%hhu -> %02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX",
                 prcv[0], prcv[1], prcv[2], prcv[3],
                 hrcv[0], hrcv[1], hrcv[2],
                 hrcv[3], hrcv[4], hrcv[5]);
