@@ -53,7 +53,7 @@ size_t make_reply(struct arp_params* prms, void* prcv, void* hrcv, void* buffer,
 uint16_t peek_ptype(void* buffer, size_t size) {
     if(size <= 8) return 0;
     struct arp_request_header* hd = (struct arp_request_header*)buffer;
-    return hd->ptype;
+    return htos16(hd->ptype);
 }
 
 int read_pdu(void* buffer, size_t size, struct arp_params* prms, void** prcv, void** hrcv) {
