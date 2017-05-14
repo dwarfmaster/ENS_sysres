@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    err = types_init("/home/hurd/ENS_sysres/arp/handlers", args.from_trivfs, args.to_trivfs, args.dev.mac);
+    err = types_init("../arp/handlers", args.from_trivfs, args.to_trivfs, args.dev.mac);
     if(err != ETH_SUCCESS) {
         log_string("Couldn't init ethertypes map");
         exit(EXIT_FAILURE);
