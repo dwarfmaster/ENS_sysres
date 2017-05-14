@@ -46,7 +46,6 @@ void* file_device_main(void* data) {
             case lvl1_frame:
                 net_msg       = (struct net_rcv_msg*)hd;
                 tpinfo.size   = (net_msg->packet_type.msgt_size / 8) * net_msg->packet_type.msgt_number;
-                tpinfo.number = 1;
                 tpinfo.id     = lvl3_frame;
                 memmove(buffer, net_msg->header, ETH_HEADER_LEN);
                 memmove(buffer + ETH_HEADER_LEN, net_msg->packet, tpinfo.size);
@@ -56,7 +55,7 @@ void* file_device_main(void* data) {
 
             case lvl2_frame:
                 tp = (mach_msg_type_t*)((char*)hd + sizeof(mach_msg_header_t));
-                size = tp->msgt_size * tp->msgt_number;
+                size = (tp->msgt_size / 8) * tp->msgt_number;
                 device_write(params->dev, D_NOWAIT, 0, buffer, size, &written);
                 break;
 

@@ -31,7 +31,7 @@ int send_data_low(mach_port_t port, size_t size, char* data, int id) {
 int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
     mach_msg_return_t err;
     struct message_full_header* hd = (struct message_full_header*)data;
-    unsigned int size = info->size * info->number;
+    unsigned int size = info->size;
     memmove(data + sizeof(struct message_full_header), data, size);
 
     hd->head.msgh_bits = MACH_MSGH_BITS_REMOTE(
@@ -43,8 +43,8 @@ int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
     hd->head.msgh_id = info->id;
 
     hd->type.msgt_name = MACH_MSG_TYPE_UNSTRUCTURED;
-    hd->type.msgt_size = info->size * 8;
-    hd->type.msgt_number = info->number;
+    hd->type.msgt_size = 8;
+    hd->type.msgt_number = info->size;
     hd->type.msgt_inline = TRUE;
     hd->type.msgt_longform = FALSE;
     hd->type.msgt_deallocate = FALSE;
@@ -77,9 +77,8 @@ int receive_data(mach_port_t* port, typeinfo_t* info, char* buffer, size_t size)
     if(!receive_data_low(port, (mach_msg_header_t**)&hd, buffer, size)) return 0;
 
     info->id     = hd->head.msgh_id;
-    info->size   = hd->type.msgt_size / 8;
-    info->number = hd->type.msgt_number;
-    memmove(buffer, buffer + sizeof(struct message_full_header), info->size * info->number);
+    info->size   = (hd->type.msgt_size / 8) * hd->type.msgt_number;
+    memmove(buffer, buffer + sizeof(struct message_full_header), info->size);
     return 1;
 }
 
@@ -89,7 +88,6 @@ int send_port_right(mach_port_t port, mach_port_t rcv) {
 
     tpinfo.id     = MACH_MSG_TYPE_MAKE_SEND;
     tpinfo.size   = sizeof(mach_port_t);
-    tpinfo.number = 1;
     buffer[0] = rcv;
     return send_data(port, &tpinfo, (char*)buffer);
 }

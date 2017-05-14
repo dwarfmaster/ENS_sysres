@@ -120,7 +120,6 @@ ethernet_error_t types_register(uint16_t tp) {
     /* Lock map */
     tpinfo.id = reserved1;
     tpinfo.size = 0;
-    tpinfo.number = 1;
     send_data(main_in, &tpinfo, buffer);
     /* Wait for lock acknowledgment from main */
     do {
@@ -142,13 +141,15 @@ ethernet_error_t types_register(uint16_t tp) {
     }
 
     clear_mach_type(&nw->port_type);
-    nw->port_type.msgt_name = MACH_MSG_TYPE_MAKE_SEND;
-    nw->port_type.msgt_size = sizeof(mach_port_t);
-    nw->port                = tf->reply;
+    nw->port_type.msgt_name   = MACH_MSG_TYPE_MAKE_SEND;
+    nw->port_type.msgt_size   = 8;
+    nw->port_type.msgt_number = sizeof(mach_port_t);
+    nw->port                  = tf->reply;
     clear_mach_type(&nw->addr_type);
-    nw->addr_type.msgt_name = MACH_MSG_TYPE_UNSTRUCTURED;
-    nw->addr_type.msgt_size = 6 + sizeof(size_t);
-    nw->addr_len            = 6;
+    nw->addr_type.msgt_name   = MACH_MSG_TYPE_UNSTRUCTURED;
+    nw->addr_type.msgt_size   = 8;
+    nw->addr_type.msgt_number = 6 + sizeof(size_t);
+    nw->addr_len              = 6;
     memcpy(nw->addr, (char*)&mac_addr, 6);
     if(!send_data_low(tf->fd, 5 + sizeof(lvl1_new_t), buffer, lvl1_new)) {
         log_variadic("Couldn't send reply port for %4X\n", tp);
@@ -160,7 +161,6 @@ ethernet_error_t types_register(uint16_t tp) {
     /* Unlock map */
     tpinfo.id = reserved2;
     tpinfo.size = sizeof(mach_port_t);
-    tpinfo.number = 1;
     dt->nport = tf->reply;
     dt->tp    = tp;
     send_data(main_in, &tpinfo, buffer);
@@ -176,7 +176,6 @@ void dispatch(uint16_t tp, uint16_t size, char* data) {
 
     tpinfo.id     = lvl3_frame;
     tpinfo.size   = size;
-    tpinfo.number = 1;
     send_data(tf->fd, &tpinfo, data);
 }
 

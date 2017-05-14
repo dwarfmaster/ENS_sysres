@@ -14,7 +14,6 @@
 typedef struct typeinfo {
     unsigned int id;
     unsigned int size;   /* Size in bytes of the type */
-    unsigned int number; /* Number of elements of that type */
 } typeinfo_t;
 
 /* Assumes there is space after data, ie it's in a buffer bigger than

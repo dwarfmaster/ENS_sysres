@@ -89,7 +89,6 @@ void message_listen(tcp_connection_t* sock, char* msg, size_t size) {
         
         tpinfo.id     = lvl4_frame;
         tpinfo.size   = size;
-        tpinfo.number = 1;
         send_data(sock->ip_conn, &tpinfo, msg);
         tcp_add_timer(sock, 200000, TIMER_RESEND_ACK_SYN, 0, 0, 1);
         sock->state   = SYN_RECEIVED;
@@ -131,7 +130,6 @@ void message_syn_sent(tcp_connection_t* sock, char* msg, size_t size) {
         
         tpinfo.id     = lvl4_frame;
         tpinfo.size   = size;
-        tpinfo.number = 1;
         send_data(sock->ip_conn, &tpinfo, msg);
         sock->state   = SYN_RECEIVED;
         tcp_add_timer(sock, 200000, TIMER_RESEND_ACK_SYN, 0, 0, 1);
@@ -150,7 +148,6 @@ void message_syn_sent(tcp_connection_t* sock, char* msg, size_t size) {
         
         tpinfo.id     = lvl4_frame;
         tpinfo.size   = size;
-        tpinfo.number = 1;
         send_data(sock->ip_conn, &tpinfo, msg);
         sock->state   = ESTABLISHED;
         return;
@@ -179,7 +176,6 @@ void message_fin_wait_1(tcp_connection_t* sock, char* msg, size_t size) {
         
         tpinfo.id     = lvl4_frame;
         tpinfo.size   = size;
-        tpinfo.number = 1;
         send_data(sock->ip_conn, &tpinfo, msg);
 
         if(fr.flags.ack) sock->state = TIME_WAIT;
@@ -204,7 +200,6 @@ void message_fin_wait_2(tcp_connection_t* sock, char* msg, size_t size) {
         
         tpinfo.id     = lvl4_frame;
         tpinfo.size   = size;
-        tpinfo.number = 1;
         send_data(sock->ip_conn, &tpinfo, msg);
         sock->state   = TIME_WAIT;
         tcp_add_timer(sock, 240000, TIMER_CLOSE, 0, 0, 1);
@@ -333,7 +328,6 @@ void end_timer(tcp_connection_t* sock, uintptr_t data) {
             
             tpinfo.id     = lvl4_frame;
             tpinfo.size   = size;
-            tpinfo.number = 1;
             send_data(sock->ip_conn, &tpinfo, msg);
             break;
 
@@ -360,7 +354,6 @@ void end_timer(tcp_connection_t* sock, uintptr_t data) {
             
             tpinfo.id     = lvl4_frame;
             tpinfo.size   = size;
-            tpinfo.number = 1;
             send_data(sock->ip_conn, &tpinfo, msg);
 
             /* TODO add TIMER_RESEND_ACK_SYN */
@@ -437,7 +430,6 @@ error_t sock_connect(tcp_connection_t* sock, char* laddr, int lport,
     
     tpinfo.id     = lvl4_frame;
     tpinfo.size   = size;
-    tpinfo.number = 1;
     send_data(sock->ip_conn, &tpinfo, msg);
     /* TODO add TIMER_RESEND_SYN */
     sock->state = SYN_SENT;
@@ -486,7 +478,6 @@ error_t sock_shutdown(tcp_connection_t* sock) {
             
             tpinfo.id     = lvl4_frame;
             tpinfo.size   = size;
-            tpinfo.number = 1;
             send_data(sock->ip_conn, &tpinfo, msg);
             /* TODO add resend fin timer */
             if(sock->state != LAST_ACK) sock->state = FIN_WAIT_1;
@@ -549,7 +540,6 @@ error_t sock_send(tcp_connection_t* sock, char* data, size_t datalen) {
 
         tpinfo.id     = lvl4_frame;
         tpinfo.size   = size;
-        tpinfo.number = 1;
         if(!send_data(sock->ip_conn, &tpinfo, buffer)) break;
 
         sock->must_ack   = 0;

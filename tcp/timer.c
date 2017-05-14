@@ -133,7 +133,6 @@ send_timeout:
         do {
             tpinfo.id     = 0;
             tpinfo.size   = sizeof(timer_message_t);
-            tpinfo.number = 1;
             out->port = heap[1].port;
             out->data = heap[1].data;
             /* Try sending until it succeeds
@@ -184,7 +183,6 @@ void add_timer(tcp_timer_t timer, uint32_t duration, int port, uintptr_t data) {
     msg->data     = data;
     tpinfo.id     = 0;
     tpinfo.size   = sizeof(struct timer);
-    tpinfo.number = 1;
     send_data(timer, &tpinfo, buffer);
 }
 

@@ -60,7 +60,7 @@ void* demuxer_thread(void* vargs) {
             /* Data received from device thread */
             case lvl3_frame:
                 if(locked) continue;
-                err = decode_frame(buffer, tpinfo.size * tpinfo.number, &frame);
+                err = decode_frame(buffer, tpinfo.size, &frame);
                 if(err != ETH_SUCCESS) continue;
                 dispatch(frame.ethertype, tpinfo.size, buffer);
                 set = tmp;
@@ -71,7 +71,6 @@ void* demuxer_thread(void* vargs) {
                 /* Acknowledge lock */
                 tpinfo.id = reserved1;
                 tpinfo.size = 0;
-                tpinfo.number = 1;
                 send_data(args->to_trivfs, &tpinfo, buffer);
                 set = tmp;
                 locked = 1;
@@ -103,7 +102,6 @@ void* demuxer_thread(void* vargs) {
                 }
                 tpinfo.id     = lvl2_frame;
                 tpinfo.size   = size;
-                tpinfo.number = 1;
                 send_data(args->dev.out, &tpinfo, buffer);
 
                 set = tmp;

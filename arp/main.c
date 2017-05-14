@@ -180,7 +180,7 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp = outp; /* Fix warnings */
     mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
     char* data          = (char*)tp + sizeof(mach_msg_type_t);;
-    size_t size         = tp->msgt_size * tp->msgt_number;
+    size_t size         = tp->msgt_size;
     uint16_t type       = peek_ptype(data, size);
     char* ha_addr       = NULL;
     char buf[1 << 12];
@@ -198,7 +198,6 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         /* ARP answer */
         tpinfo.id     = arp_answer;
         tpinfo.size   = handler->params.plen + handler->params.hlen;
-        tpinfo.number = 1;
         printf("%d.%d.%d.%d -> %02X:%02X:%02X:%02X:%02X:%02X",
                 prcv[0], prcv[1], prcv[2], prcv[3],
                 hrcv[0], hrcv[1], hrcv[2],
@@ -214,7 +213,6 @@ void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         size          = make_reply(&handler->params, prcv, ha_addr, buf, 4096);
         tpinfo.id     = lvl32_frame;
         tpinfo.size   = size;
-        tpinfo.number = 1;
         send_data(ethernet_port, &tpinfo, buf);
     }
 }
@@ -235,7 +233,6 @@ void arp_query_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
     tpinfo.id     = lvl32_frame;
     tpinfo.size   = size;
-    tpinfo.number = 1;
     send_data(ethernet_port, &tpinfo, buf);
 }
 
