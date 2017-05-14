@@ -58,11 +58,11 @@ void* demuxer_thread(void* vargs) {
 
         switch(tpinfo.id) {
             /* Data received from device thread */
-            case lvl3_frame:
+            case lvl2_frame:
                 if(locked) continue;
                 err = decode_frame(buffer, tpinfo.size, &frame);
                 if(err != ETH_SUCCESS) continue;
-                dispatch(frame.ethertype, tpinfo.size, buffer);
+                dispatch(frame.ethertype, frame.size, frame.data);
                 set = tmp;
                 break;
 
