@@ -37,6 +37,7 @@ void* file_device_main(void* data) {
     mach_msg_header_t* hd;
     mach_msg_type_t* tp;
     struct net_rcv_msg* net_msg;
+    struct packet_header* pck_hd;
 
     while(1) {
         used = params->set;
@@ -45,10 +46,12 @@ void* file_device_main(void* data) {
         switch(hd->msgh_id) {
             case lvl1_frame:
                 net_msg       = (struct net_rcv_msg*)hd;
-                tpinfo.size   = (net_msg->packet_type.msgt_size / 8) * net_msg->packet_type.msgt_number;
-                tpinfo.id     = lvl3_frame;
+                pck_hd        = (struct packet_header*)net_msg->packet;
+                tpinfo.size   = pck_hd->length;
+                tpinfo.id     = lvl2_frame;
                 memmove(buffer, net_msg->header, ETH_HEADER_LEN);
-                memmove(buffer + ETH_HEADER_LEN, net_msg->packet, tpinfo.size);
+                memmove(buffer + ETH_HEADER_LEN,
+                        net_msg->packet + sizeof(struct packet_header), tpinfo.size);
                 tpinfo.size  += ETH_HEADER_LEN;
                 send_data(params->out, &tpinfo, buffer);
                 break;
