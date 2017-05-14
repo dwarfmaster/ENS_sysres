@@ -1,7 +1,7 @@
 
 CFLAGS=-Wall -Wextra -g -D_GNU_SOURCE
 CC=gcc
-OBJS=logging.o ports.o endian.o
+OBJS=logging.o ports.o endian.o timer.0
 LIB=lib.a
 
 all: $(LIB)
