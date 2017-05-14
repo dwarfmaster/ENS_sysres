@@ -176,7 +176,7 @@ error_t trivfs_goaway(struct trivfs_control* cntl, int flags) {
 
 typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_header_t *outp);
 
-void lvl2_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
+void lvl3_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp = outp; /* Fix warnings */
     mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
     char* data          = (char*)tp + sizeof(mach_msg_type_t);;
@@ -264,8 +264,8 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
             memcpy(mac_address, lvl1->addr, mac_addr_len);
             break;
         
-        case lvl2_frame:
-            routine = lvl2_frame_r;
+        case lvl3_frame:
+            routine = lvl3_frame_r;
             break;
         
         case arp_query:
