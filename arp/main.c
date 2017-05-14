@@ -307,8 +307,8 @@ int main() {
         return 1; // IO
     }
 
-    ports_manage_port_operations_multithread(fsys->pi.bucket,
-            arp_demuxer, 0, 0, 0);
+    ports_manage_port_operations_one_thread(fsys->pi.bucket,
+            arp_demuxer, 0);
     return 0; // SUCCESS
 }
 
