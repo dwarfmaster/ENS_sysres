@@ -39,7 +39,7 @@ uint32_t read_ip_addr(const char* text) {
 }
 
 void write_ip_addr(uint32_t addr, char* buffer) {
-    snprintf(buffer, 12, "%u.%u.%u.%u", (addr >> 24) & 0xFF,
+    snprintf(buffer, 16, "%u.%u.%u.%u", (addr >> 24) & 0xFF,
             (addr >> 16) & 0xFF, (addr >> 8) & 0xFF, addr & 0xFF);
 }
 
