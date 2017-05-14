@@ -13,7 +13,7 @@ mach_port_type_t get_send_right(mach_port_t port) {
     switch(tp) {
         case MACH_PORT_TYPE_SEND_ONCE:
         case MACH_PORT_TYPE_SEND:
-            return MACH_MSG_TYPE_PORT_SEND;
+            return MACH_MSG_TYPE_COPY_SEND;
         default:
             return MACH_MSG_TYPE_MAKE_SEND;
     }
