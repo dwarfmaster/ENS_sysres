@@ -192,8 +192,8 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     req->next = NULL;
 
     char* et = req->buffer;
-    et[0] = 0x08;
-    et[1] = 0x00;
+    et[0] = 0x00;
+    et[1] = 0x08;
 
     ih = (struct ip_header*)req->buffer + 2 + sizeof(struct mac_address);
     ih->hd             = build_hd(VERSION, IHL);
