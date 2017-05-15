@@ -245,6 +245,7 @@ void arp_query_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 void arp_register_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp                = outp; /* prevent warnings */
     arp_register_t* reg = (arp_register_t*)((char*)inp + sizeof(mach_msg_header_t));
+    mach_port_insert_right(mach_task_self(), reg->port, reg->port, MACH_MSG_TYPE_COPY_SEND);
     add_handler(reg->type, reg->len, reg->data, reg->port);
 }
 
@@ -257,6 +258,7 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
     switch(inp->msgh_id) {
         case lvl1_new:
+            mach_port_insert_right(mach_task_self(), lvl1->port, lvl1->port, MACH_MSG_TYPE_COPY_SEND);
             ethernet_port = lvl1->port;
             mac_addr_len  = lvl1->addr_len;
             memcpy(mac_address, lvl1->addr, mac_addr_len);
