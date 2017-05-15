@@ -22,8 +22,9 @@ struct handler {
 };
 
 struct handler* handlers;
-char* mac_address = NULL;
-size_t mac_addr_len;
+char mac_address[256];
+char mac_broadcast[256];
+size_t mac_addr_len = 0;
 mach_port_t ethernet_port;
 
 void init_handlers() {
@@ -59,6 +60,13 @@ int add_handler(uint16_t type, uint8_t len, char* addr, mach_port_t out) {
     hd->type      = type;
     hd->addr_len  = len;
     memcpy(&hd->addr, addr, len);
+    hd->params.broadcast = mac_broadcast;
+    hd->params.haddr     = mac_address;
+    hd->params.htype     = 1; /* TODO make it ethernet independant */
+    hd->params.hlen      = mac_addr_len;
+    hd->params.paddr     = hd->addr;
+    hd->params.ptype     = type;
+    hd->params.plen      = len;
     hd->out  = out;
     handlers = hd;
     return 1;
@@ -255,13 +263,9 @@ static int arp_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         case lvl1_new:
             ethernet_port = lvl1->port;
             mac_addr_len  = lvl1->addr_len;
-            if(mac_address != NULL) free(mac_address);
-            mac_address = malloc(mac_addr_len);
-            if(mac_address == NULL) {
-                log_variadic("Couldn't allocate mac address of size : %d\n", (int)mac_addr_len);
-                return 0;
-            }
             memcpy(mac_address, lvl1->addr, mac_addr_len);
+            /* Assume broadcast is always of the same form XXX */
+            memset(mac_broadcast, 0xff, mac_addr_len);
             break;
         
         case lvl3_frame:
