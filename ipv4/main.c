@@ -5,15 +5,17 @@
 #include <hurd.h>
 #include <hurd/trivfs.h>
 #include "ip.h"
+#include "logging.h"
 #include "ports.h"
 #include "proto.h"
+#include <fcntl.h>
 
 #define MAX_SIZE (1 << 16) - 20
 
 #define IPv4    4
 #define VERSION IPv4
 #define IHL     5
-#define DCSP    0 // ???
+#define DSCP    0 // ???
 #define ECN     0 // ???
 #define TCP     0x06
 #define TIMEOUT 900
@@ -38,7 +40,7 @@ struct mac_value {
 };
 
 static struct mac_value* cache[1 << 16];
-mac_port_t ip_port;
+mach_port_t ip_port;
 
 static inline uint16_t hash(uint32_t ip) {
     return ip % (1 << 16);
@@ -50,7 +52,7 @@ uint32_t get_time() {
     return time.seconds * 1000 + time.microseconds / 1000;
 }
 
-int send_request(struct requests* req, struct mac_address ma) {
+void send_request(struct requests* req, struct mac_address ma) {
     struct typeinfo tpinfo;
     tpinfo.id = lvl32_frame;
     tpinfo.size = req->size;
@@ -69,6 +71,91 @@ struct mac_value* lookup(uint32_t ip) {
     return mv;
 }
 
+/* TrivFS symbols */
+int trivfs_fstype        = FSTYPE_MISC;
+int trivfs_fsid          = 0;
+int trivfs_allow_open    = O_READ | O_WRITE;
+int trivfs_support_read  = 0;
+int trivfs_support_write = 0;
+int trivfs_support_exec  = 0;
+
+/* Misc necessary trivfs callbacks */
+void trivfs_modify_stat(struct trivfs_protid* cred, io_statbuf_t* st) {
+    cred = cred; /* Fix warnings */
+    st = st; /* Fix warnings */
+    /* Do nothing */
+}
+
+error_t trivfs_S_file_set_size(struct trivfs_protid* cred, off_t size) {
+    size = size; /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_seek(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t reply_type, off_t offs, int whence, off_t* new_offs) {
+    reply      = reply;      /* Fix warnings */
+    reply_type = reply_type; /* Fix warnings */
+    offs       = offs;       /* Fix warnings */
+    whence     = whence;     /* Fix warnings */
+    new_offs   = new_offs;   /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_select(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* type, int* tag) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    type      = type;      /* Fix warnings */
+    tag       = tag;       /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_get_openmodes(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* bits) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    bits      = bits;      /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_set_all_openmodes(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* bits) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    bits      = bits;      /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_set_some_openmodes(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* bits) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    bits      = bits;      /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_S_io_clear_some_openmodes(struct trivfs_protid* cred, mach_port_t reply,
+        mach_msg_type_name_t replytype, int* bits) {
+    reply     = reply;     /* Fix warnings */
+    replytype = replytype; /* Fix warnings */
+    bits      = bits;      /* Fix warnings */
+    if(!cred) return EOPNOTSUPP;
+    else      return 0;
+}
+
+error_t trivfs_goaway(struct trivfs_control* cntl, int flags) {
+    cntl  = cntl;  /* Fix warnings */
+    flags = flags; /* Fix warnings */
+    exit(EXIT_SUCCESS);
+    return 0;
+}
+
 // Routines
 
 typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_header_t *outp);
@@ -76,7 +163,7 @@ typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_header_t *outp);
 // MSG sent: mac_address + ip_header + ip_data
 void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp = outp; /* Fix warnings */
-    mach_msg_type_t tp  = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
+    mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
     char* data          = (char*)tp + sizeof(mach_msg_header_t);
     size_t size         = (tp->msgt_size / 8) * tp->msgt_number;
     if(size > MAX_SIZE) {
@@ -84,7 +171,7 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         return;
     }
 
-    struct request* req = malloc(sizeof(struct requests));
+    struct requests* req = malloc(sizeof(struct requests));
     struct ip_header* ih;
 
     uint32_t ip = *((uint32_t*)data); // TODO may have to convert if little endian
@@ -95,7 +182,7 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     req->size = sizeof(struct mac_address) + sizeof(struct ip_header) + size;
     req->next = NULL;
 
-    ih = req->buffer + sizeof(struct mac_address);
+    ih = (struct ip_header*)req->buffer + sizeof(struct mac_address);
     ih->hd             = build_hd(VERSION, IHL);
     ih->dscp_ecn       = build_dscp_ecn(DSCP, ECN);
     ih->length         = sizeof(struct ip_header) + size;
@@ -115,15 +202,15 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         mv->ip = ip;
         mv->waiting = 0;
         mv->time = time - TIMEOUT - 1; // To ensure that current mac address is outdated
-        mv->next = cache[hs];
-        cache[hs] = mv;
+        mv->next = cache[hash(ip)];
+        cache[hash(ip)] = mv;
     }
 
     // This may fail if the answer of a previous request arrives
     // before we add the new one to the queue
     if(!mv->waiting && time - mv->time > TIMEOUT) {
         // TODO send mach_msg to ip to seek ip mac_address
-        send_data(arp_port, &tp_info, buf);
+        //send_data(arp_port, &tp_info, buf);
 
         mv->waiting = 1;
     }
@@ -137,7 +224,7 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
 void refresh_ip_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp = outp; /* Fix warnings */
-    mach_msg_type_t tp  = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
+    mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
     char* data          = (char*)tp + sizeof(mach_msg_header_t);
     size_t size         = (tp->msgt_size / 8) * tp->msgt_number;
     if(size != sizeof(uint32_t) + sizeof(struct mac_address)) {
@@ -165,7 +252,6 @@ void refresh_ip_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
 static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     routine_t routine   = NULL;
-    mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
 
     log_variadic("ipv4 received : %d\n", inp->msgh_id);
 
@@ -192,8 +278,6 @@ int main() {
     mach_port_t bootstrap;
     struct trivfs_control* fsys;
 
-    init_handlers();
-
     /* TODO parse arguments */
 
     task_get_bootstrap_port(mach_task_self(), &bootstrap);
@@ -208,8 +292,8 @@ int main() {
         return 1; // IO
     }
 
-    // TODO use name of final ipv4 translator
-    ip_port = file_name_lookup("./IPv4", O_READ | O_WRITE, 0);
+    // TODO use name of final ipv4 translator and test if succeeded
+    //ip_port = file_name_lookup("./IPv4", O_READ | O_WRITE, 0);
 
     ports_manage_port_operations_one_thread(fsys->pi.bucket,
             ip_demuxer, 0);
