@@ -26,7 +26,7 @@ int send_data_low(mach_port_t port, size_t size, char* data, int id) {
 
     hd->msgh_bits = MACH_MSGH_BITS_REMOTE(get_send_right(port))
         | MACH_MSGH_BITS_COMPLEX;
-    hd->msgh_size = size + sizeof(struct message_full_header);
+    hd->msgh_size = size + sizeof(mach_msg_header_t);
     /* round size to multiple of 4 */
     hd->msgh_size = ((hd->msgh_size + 3) >> 2) << 2;
     hd->msgh_local_port = MACH_PORT_NULL;
