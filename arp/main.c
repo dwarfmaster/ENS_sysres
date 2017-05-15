@@ -190,7 +190,6 @@ void lvl3_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     char* data          = (char*)tp + sizeof(mach_msg_type_t);;
     size_t size         = (tp->msgt_size / 8) * tp->msgt_number;
     uint16_t type       = peek_ptype(data, size);
-    char* ha_addr       = NULL;
     char buf[1 << 12];
     struct handler* handler;
     typeinfo_t tpinfo;
@@ -216,9 +215,8 @@ void lvl3_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         send_data(handler->out, &tpinfo, buf);
     } else {
         /* ARP query */
-        if(ha_addr == NULL) return; // WUT ?
         if(memcmp(prcv, handler->addr, handler->addr_len) != 0) return;
-        size          = make_reply(&handler->params, prcv, ha_addr, buf, 4096);
+        size          = make_reply(&handler->params, prcv, mac_address, buf, 4096);
         tpinfo.id     = lvl32_frame;
         tpinfo.size   = size;
         send_data(ethernet_port, &tpinfo, buf);
