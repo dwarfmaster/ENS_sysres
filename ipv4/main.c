@@ -19,7 +19,7 @@
 #define TIMEOUT 900
 
 struct mac_address {
-    uint8_t b0, b1, b2, b3;
+    uint8_t b0, b1, b2, b3, b4, b5;
 };
 
 struct requests {
@@ -38,7 +38,7 @@ struct mac_value {
 };
 
 static struct mac_value* cache[1 << 16];
-mac_port_t arp_port;
+mac_port_t ip_port;
 
 static inline uint16_t hash(uint32_t ip) {
     return ip % (1 << 16);
@@ -55,8 +55,18 @@ int send_request(struct requests* req, struct mac_address ma) {
     tpinfo.id = lvl32_frame;
     tpinfo.size = req->size;
     memcpy(req->buffer, &ma, sizeof(struct mac_address));
-    send_data(arp_port, &tpinfo, (char*)req->buffer);
+    send_data(ip_port, &tpinfo, (char*)req->buffer);
     if(req->next != NULL) send_request(req->next, ma);
+    free(req);
+}
+
+struct mac_value* lookup(uint32_t ip) {
+    struct mac_value* mv = cache[hash(ip)];
+    while(mv != NULL) {
+        if(mv->ip == ip) break;
+        mv = mv->next;
+    }
+    return mv;
 }
 
 // Routines
@@ -80,8 +90,7 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     uint32_t ip = *((uint32_t*)data); // TODO may have to convert if little endian
     data += sizeof(uint32_t);
 
-    uint16_t hs = hash(ip);
-    struct mac_value* mv = cache[hs];
+    uint32_t time = get_time();
 
     req->size = sizeof(struct mac_address) + sizeof(struct ip_header) + size;
     req->next = NULL;
@@ -100,11 +109,7 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
     memcpy(ih + sizeof(struct ip_header), data, size);
 
-    uint32_t time = get_time();
-    while(mv != NULL) {
-        if(mv->ip == ip) break;
-        mv = mv->next;
-    }
+    struct mac_value* mv = lookup(ip);
     if(mv == NULL) {
         mv = malloc(sizeof(struct mac_value));
         mv->ip = ip;
@@ -117,8 +122,10 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     // This may fail if the answer of a previous request arrives
     // before we add the new one to the queue
     if(!mv->waiting && time - mv->time > TIMEOUT) {
-        mv->waiting = 1;
         // TODO send mach_msg to ip to seek ip mac_address
+        send_data(arp_port, &tp_info, buf);
+
+        mv->waiting = 1;
     }
     if(mv->waiting) {
         req->next = mv->reqs;
@@ -126,6 +133,34 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     } else {
         send_request(req, mv->ma);
     }
+}
+
+void refresh_ip_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
+    outp = outp; /* Fix warnings */
+    mach_msg_type_t tp  = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
+    char* data          = (char*)tp + sizeof(mach_msg_header_t);
+    size_t size         = (tp->msgt_size / 8) * tp->msgt_number;
+    if(size != sizeof(uint32_t) + sizeof(struct mac_address)) {
+        log_variadic("IP received arp answer of invalid length : %u\n", size);
+        return;
+    }
+
+    uint32_t ip           = *((uint32_t*)data);
+    struct mac_address ma = *((struct mac_address*)data + sizeof(uint32_t));
+
+    struct mac_value* mv = lookup(ip);
+    if(mv == NULL || mv->waiting == 0) {
+        char buf[16];
+        write_ip_addr(ip, buf);
+        log_variadic("IP ignored arp answer for ip : %s\n", buf);
+        return;
+    }
+
+    mv->time = get_time();
+    mv->ma = ma;
+    send_request(mv->reqs, ma);
+    mv->reqs = NULL;
+    mv->waiting = 0;
 }
 
 static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
@@ -137,6 +172,10 @@ static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     switch(inp->msgh_id) {
         case lvl4_frame:
             routine = send_to_r;
+            break;
+
+        case arp_answer:
+            routine = refresh_ip_r;
             break;
 
         default:
@@ -170,7 +209,7 @@ int main() {
     }
 
     // TODO use name of final ipv4 translator
-    arp_port = file_name_lookup("./IPv4", O_READ | O_WRITE, 0);
+    ip_port = file_name_lookup("./IPv4", O_READ | O_WRITE, 0);
 
     ports_manage_port_operations_one_thread(fsys->pi.bucket,
             ip_demuxer, 0);
