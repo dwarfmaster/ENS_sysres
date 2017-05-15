@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <hurd.h>
+#include <hurd/trivfs.h>
 #include "ip.h"
 #include "ports.h"
 #include "proto.h"
@@ -57,8 +59,12 @@ int send_request(struct requests* req, struct mac_address ma) {
     if(req->next != NULL) send_request(req->next, ma);
 }
 
+// Routines
+
+typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_header_t *outp);
+
 // MSG sent: mac_address + ip_header + ip_data
-void get_mac_address_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
+void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp = outp; /* Fix warnings */
     mach_msg_type_t tp  = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
     char* data          = (char*)tp + sizeof(mach_msg_header_t);
@@ -122,15 +128,52 @@ void get_mac_address_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     }
 }
 
-int main(int argc, char *argv[]) {
-    char* buffer[2048];
-    uint32_t ip;
-    while(1) {
-        scanf("%s", buffer);
-        ip = read_ip_addr(buffer);
-        write_ip_addr(ip, buffer);
-        printf("%s\n", buffer);
+static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
+    routine_t routine   = NULL;
+    mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
+
+    log_variadic("ipv4 received : %d\n", inp->msgh_id);
+
+    switch(inp->msgh_id) {
+        case lvl4_frame:
+            routine = send_to_r;
+            break;
+
+        default:
+            if(!trivfs_demuxer(inp, outp))
+                return 0;
     }
+    if(routine)
+        (*routine) (inp, outp);
     return 0;
+}
+
+int main() {
+    error_t err;
+    mach_port_t bootstrap;
+    struct trivfs_control* fsys;
+
+    init_handlers();
+
+    /* TODO parse arguments */
+
+    task_get_bootstrap_port(mach_task_self(), &bootstrap);
+    if(bootstrap == MACH_PORT_NULL) {
+        log_string("Must be started as a translator");
+        return 1; // INVALID
+    }
+
+    err = trivfs_startup(bootstrap, 0, 0, 0, 0, 0, &fsys);
+    if(err) {
+        log_string("Couldn't setup translator");
+        return 1; // IO
+    }
+
+    // TODO use name of final ipv4 translator
+    arp_port = file_name_lookup("./IPv4", O_READ | O_WRITE, 0);
+
+    ports_manage_port_operations_one_thread(fsys->pi.bucket,
+            ip_demuxer, 0);
+    return 0; // SUCCESS
 }
 
