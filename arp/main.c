@@ -246,9 +246,7 @@ void arp_query_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
 void arp_register_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp                = outp; /* prevent warnings */
-    mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
-    char* data          = (char*)tp + sizeof(mach_msg_type_t);;
-    arp_register_t* reg = (arp_register_t*)data;
+    arp_register_t* reg = (arp_register_t*)((char*)inp + sizeof(mach_msg_header_t));
     add_handler(reg->type, reg->len, reg->data, reg->port);
 }
 
