@@ -26,6 +26,12 @@ struct file_device_main_data {
     mach_port_t out;
 };
 
+struct device_lvl2_data {
+    mach_msg_header_t hd;
+    mach_msg_type_t tp;
+    char [];
+} __attribute__((__packed__));
+
 #define ETH_HEADER_LEN 14
 
 void* file_device_main(void* data) {
@@ -38,6 +44,7 @@ void* file_device_main(void* data) {
     mach_msg_type_t* tp;
     struct net_rcv_msg* net_msg;
     struct packet_header* pck_hd;
+    struct device_lvl2_data* lvl2;
 
     while(1) {
         used = params->set;
@@ -57,9 +64,9 @@ void* file_device_main(void* data) {
                 break;
 
             case lvl2_frame:
-                tp = (mach_msg_type_t*)((char*)hd + sizeof(mach_msg_header_t));
-                size = (tp->msgt_size / 8) * tp->msgt_number;
-                device_write(params->dev, D_NOWAIT, 0, buffer, size, &written);
+                lvl2 = (struct device_lvl2_data*)buffer;
+                size = (lvl2->tp.msgt_size / 8) * lvl2->tp.msgt_number;
+                device_write(params->dev, D_NOWAIT, 0, lvl2->data, size, &written);
                 break;
 
             default:
