@@ -169,7 +169,7 @@ void make_request(mach_port_t port, char* ip) {
 
 typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_header_t *outp);
 
-// MSG sent: mac_address + ip_header + ip_data
+// MSG sent: ethertype + mac_address + ip_header + ip_data
 void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp = outp; /* Fix warnings */
     mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
@@ -188,10 +188,14 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
     uint32_t time = get_time();
 
-    req->size = sizeof(struct mac_address) + sizeof(struct ip_header) + size;
+    req->size = 2 + sizeof(struct mac_address) + sizeof(struct ip_header) + size;
     req->next = NULL;
 
-    ih = (struct ip_header*)req->buffer + sizeof(struct mac_address);
+    char* et = req->buffer;
+    et[0] = 0x08;
+    et[1] = 0x00;
+
+    ih = (struct ip_header*)req->buffer + 2 + sizeof(struct mac_address);
     ih->hd             = build_hd(VERSION, IHL);
     ih->dscp_ecn       = build_dscp_ecn(DSCP, ECN);
     ih->length         = sizeof(struct ip_header) + size;
