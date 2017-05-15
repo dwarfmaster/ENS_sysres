@@ -17,5 +17,7 @@ typedef struct timer_message {
 tcp_timer_t start_timer_thread(mach_port_t port);
 void add_timer(tcp_timer_t timer, uint32_t duration, int port, uintptr_t data);
 
+uint32_t get_time();
+
 #endif//DEF_TCP_TIMER
 

@@ -20,7 +20,8 @@ enum Id {
     reserved3,
     arp_query,
     arp_register,
-    arp_answer
+    arp_answer,
+    timer_msg
 };
 
 typedef struct lvl1_new {

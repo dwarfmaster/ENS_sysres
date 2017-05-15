@@ -1,6 +1,6 @@
 
 CFLAGS=-Wall -Wextra -g -D_GNU_SOURCE -I ../lib
-LDFLAGS=-ltrivfs -lports
+LDFLAGS=-ltrivfs -lports -lpthread
 CC=gcc
 OBJS=main.o ip.o
 PROG=eth.out

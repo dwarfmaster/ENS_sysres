@@ -8,6 +8,7 @@
 #include "logging.h"
 #include "ports.h"
 #include "proto.h"
+#include "timer.h"
 #include <fcntl.h>
 
 #define MAX_SIZE (1 << 16) - 20
@@ -40,16 +41,11 @@ struct mac_value {
 };
 
 static struct mac_value* cache[1 << 16];
-mach_port_t ip_port;
+mach_port_t ip_port, arp_port, timer_port;
+char myip[4];
 
 static inline uint16_t hash(uint32_t ip) {
     return ip % (1 << 16);
-}
-
-uint32_t get_time() {
-    time_value_t time;
-    host_get_time(mach_host_self(), &time);
-    return time.seconds * 1000 + time.microseconds / 1000;
 }
 
 void send_request(struct requests* req, struct mac_address ma) {
@@ -57,7 +53,7 @@ void send_request(struct requests* req, struct mac_address ma) {
     tpinfo.id = lvl32_frame;
     tpinfo.size = req->size;
     memcpy(req->buffer, &ma, sizeof(struct mac_address));
-    send_data(ip_port, &tpinfo, (char*)req->buffer);
+    send_data(arp_port, &tpinfo, (char*)req->buffer);
     if(req->next != NULL) send_request(req->next, ma);
     free(req);
 }
@@ -156,6 +152,19 @@ error_t trivfs_goaway(struct trivfs_control* cntl, int flags) {
     return 0;
 }
 
+void make_request(mach_port_t port, char* ip) {
+    arp_query_t* query;
+    char buffer[256];
+    typeinfo_t tpinfo;
+
+    query = (arp_query_t*)buffer;
+    query->type = 0x0800; // IPv4
+    memcpy(query->addr, ip, 4);
+    tpinfo.id   = arp_query;
+    tpinfo.size = 6;
+    send_data(port, &tpinfo, buffer);
+}
+
 // Routines
 
 typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_header_t *outp);
@@ -206,12 +215,8 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         cache[hash(ip)] = mv;
     }
 
-    // This may fail if the answer of a previous request arrives
-    // before we add the new one to the queue
     if(!mv->waiting && time - mv->time > TIMEOUT) {
-        // TODO send mach_msg to ip to seek ip mac_address
-        //send_data(arp_port, &tp_info, buf);
-
+        add_timer(timer_port, 0, 0, ip);
         mv->waiting = 1;
     }
     if(mv->waiting) {
@@ -252,12 +257,23 @@ void refresh_ip_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
 static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     routine_t routine   = NULL;
+    timer_message_t* msg;
+    uint32_t ip;
 
     log_variadic("ipv4 received : %d\n", inp->msgh_id);
 
     switch(inp->msgh_id) {
         case lvl4_frame:
             routine = send_to_r;
+            break;
+
+        case timer_msg:
+            msg = (timer_message_t*)inp
+                + sizeof(mach_msg_header_t)
+                + sizeof(mach_msg_type_t);
+            ip = *(uint32_t*)msg->data;
+            make_request(arp_port, (char*)(&ip));
+            if(lookup(ip)->waiting == 1) add_timer(timer_port, 60*1000, 0, ip);
             break;
 
         case arp_answer:
@@ -275,8 +291,12 @@ static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
 int main() {
     error_t err;
+    kern_return_t ret;
     mach_port_t bootstrap;
     struct trivfs_control* fsys;
+    char buffer[1 << 11];
+
+    for(int i = 0; i < 4; myip[i++] = 0x00);
 
     /* TODO parse arguments */
 
@@ -292,8 +312,43 @@ int main() {
         return 1; // IO
     }
 
-    // TODO use name of final ipv4 translator and test if succeeded
-    //ip_port = file_name_lookup("./IPv4", O_READ | O_WRITE, 0);
+    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &ip_port);
+    if(ret != KERN_SUCCESS) {
+        printf("Couldn't allocate input port for IPv4\n");
+        return 1;
+    }
+
+    timer_port = start_timer_thread(ip_port);
+
+    // TODO use better arp address
+    arp_port = file_name_lookup("./0806", O_READ | O_WRITE, 0);
+    if(arp_port == MACH_PORT_NULL) {
+        printf("Couldn't open arp port\n");
+        return 1;
+    }
+
+    arp_register_t* reg = (arp_register_t*)buffer;
+    reg->port_type.msgt_name          = MACH_MSG_TYPE_MAKE_SEND;
+    reg->port_type.msgt_size          = sizeof(mach_port_t) * 8;
+    reg->port_type.msgt_number        = 1;
+    reg->port_type.msgt_inline        = TRUE;
+    reg->port_type.msgt_longform      = FALSE;
+    reg->port_type.msgt_deallocate    = FALSE;
+    reg->port_type.msgt_unused        = 0;
+    reg->port                         = ip_port;
+
+    reg->content_type.msgt_name       = MACH_MSG_TYPE_UNSTRUCTURED;
+    reg->content_type.msgt_size       = 8;
+    reg->content_type.msgt_number     = 8;
+    reg->content_type.msgt_inline     = TRUE;
+    reg->content_type.msgt_longform   = FALSE;
+    reg->content_type.msgt_deallocate = FALSE;
+    reg->content_type.msgt_unused     = 0;
+    reg->type                         = 0x0800; // IPv4
+    reg->len                          = 4;
+    memcpy(reg->data, myip, 4);
+
+    send_data_low(arp_port, sizeof(arp_register_t) + 8, buffer, arp_register);
 
     ports_manage_port_operations_one_thread(fsys->pi.bucket,
             ip_demuxer, 0);
