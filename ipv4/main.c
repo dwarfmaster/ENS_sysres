@@ -68,21 +68,28 @@ void get_mac_address_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
     uint32_t time = get_time();
     while(mv != NULL) {
-        if(mv->ip == ip) {
-            if(!mv->waiting && time - mv->time > TIMEOUT) {
-                mv->waiting = 1;
-                // send mach_msg to ip to seek ip mac_address
-            }
-            if(mv->waiting) {
-                req->next = mv->reqs;
-                req->size = size;
-                mv->reqs  = req;
-            } else {
-                send_request(req, mv->ma);
-            }
-            return;
-        }
+        if(mv->ip == ip) break;
         mv = mv->next;
+    }
+    if(mv == NULL) {
+        mv = malloc(sizeof(struct mac_value));
+        mv->ip = ip;
+        mv->waiting = 0;
+        mv->time = time - TIMEOUT - 1; // to ensure that current mac address is outdated
+        mv->next = cache[hs];
+        cache[hs] = mv;
+    }
+
+    if(!mv->waiting && time - mv->time > TIMEOUT) {
+        mv->waiting = 1;
+        // TODO send mach_msg to ip to seek ip mac_address
+    }
+    if(mv->waiting) {
+        req->next = mv->reqs;
+        req->size = size;
+        mv->reqs  = req;
+    } else {
+        send_request(req, mv->ma);
     }
 }
 
