@@ -93,6 +93,7 @@ void clear_mach_type(mach_msg_type_t* t) {
     t->msgt_inline     = TRUE;
     t->msgt_longform   = FALSE;
     t->msgt_deallocate = FALSE;
+    t->msgt_unused     = 0;
 }
 
 ethernet_error_t types_register(uint16_t tp) {
@@ -142,8 +143,8 @@ ethernet_error_t types_register(uint16_t tp) {
 
     clear_mach_type(&nw->port_type);
     nw->port_type.msgt_name   = MACH_MSG_TYPE_MAKE_SEND;
-    nw->port_type.msgt_size   = 8;
-    nw->port_type.msgt_number = sizeof(mach_port_t);
+    nw->port_type.msgt_size   = 8 * sizeof(mach_port_t);
+    nw->port_type.msgt_number = 1;
     nw->port                  = tf->reply;
     clear_mach_type(&nw->addr_type);
     nw->addr_type.msgt_name   = MACH_MSG_TYPE_UNSTRUCTURED;

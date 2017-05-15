@@ -59,7 +59,7 @@ int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
     hd->type.msgt_inline = TRUE;
     hd->type.msgt_longform = FALSE;
     hd->type.msgt_deallocate = FALSE;
-    hf->type.msgt_unused = 0;
+    hd->type.msgt_unused = 0;
 
     err = mach_msg( &hd->head, MACH_SEND_MSG,
             hd->head.msgh_size, 0, MACH_PORT_NULL,
