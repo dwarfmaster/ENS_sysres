@@ -24,7 +24,8 @@ int send_data_low(mach_port_t port, size_t size, char* data, int id) {
     mach_msg_header_t* hd = (mach_msg_header_t*)data;
     memmove(data + sizeof(mach_msg_header_t), data, size);
 
-    hd->msgh_bits = MACH_MSGH_BITS_REMOTE(get_send_right(port));
+    hd->msgh_bits = MACH_MSGH_BITS_REMOTE(get_send_right(port))
+        | MACH_MSGH_BITS_COMPLEX;
     hd->msgh_size = size + sizeof(struct message_full_header);
     /* round size to multiple of 4 */
     hd->msgh_size = ((hd->msgh_size + 3) >> 2) << 2;
@@ -58,6 +59,7 @@ int send_data(mach_port_t port, const typeinfo_t* info, char* data) {
     hd->type.msgt_inline = TRUE;
     hd->type.msgt_longform = FALSE;
     hd->type.msgt_deallocate = FALSE;
+    hf->type.msgt_unused = 0;
 
     err = mach_msg( &hd->head, MACH_SEND_MSG,
             hd->head.msgh_size, 0, MACH_PORT_NULL,
@@ -92,6 +94,7 @@ int receive_data(mach_port_t* port, typeinfo_t* info, char* buffer, size_t size)
     return 1;
 }
 
+/* TODO Wrong */
 int send_port_right(mach_port_t port, mach_port_t rcv) {
     typeinfo_t tpinfo;
     mach_port_t buffer[64];
