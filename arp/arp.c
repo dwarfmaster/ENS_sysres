@@ -11,10 +11,15 @@ struct arp_request_header {
 } __attribute__ ((__packed__));
 
 size_t make_request(const struct arp_params* prms, void* prcv, void* buffer, size_t size) {
-    if(size < sizeof(struct arp_request_header) + 3*prms->hlen + 2*prms->plen) return 0;
+    if(size < sizeof(struct arp_request_header) + 2 + 3*prms->hlen + 2*prms->plen) return 0;
+
+    *(uint16_t*)buffer = 0x0806;
+    buffer += 2;
+    memcpy(buffer, prms->broadcast, prms->hlen);
+    buffer += prms->hlen;
+
     struct arp_request_header* hd = (struct arp_request_header*)buffer;
     char* data = buffer + prms->hlen + sizeof(struct arp_request_header);
-    memcpy(buffer, prms->broadcast, prms->hlen);
 
     hd->htype = stoh16(prms->htype);
     hd->ptype = stoh16(prms->ptype);
@@ -27,14 +32,19 @@ size_t make_request(const struct arp_params* prms, void* prcv, void* buffer, siz
     data += prms->hlen; /* In requests, the target hardware address is ignored */
     memcpy(data, prcv,        prms->plen);
 
-    return sizeof(struct arp_request_header) + 3*prms->hlen + 2*prms->plen;
+    return sizeof(struct arp_request_header) + 2 + 3*prms->hlen + 2*prms->plen;
 }
 
 size_t make_reply(struct arp_params* prms, void* prcv, void* hrcv, void* buffer, size_t size) {
-    if(size < sizeof(struct arp_request_header) + 3*prms->hlen + 2*prms->plen) return 0;
+    if(size < sizeof(struct arp_request_header) + 2 + 3*prms->hlen + 2*prms->plen) return 0;
+
+    *(uint16_t*)buffer = 0x0806;
+    buffer += 2;
+    memcpy(buffer, hrcv, prms->hlen);
+    buffer += prms->hlen;
+
     struct arp_request_header* hd = (struct arp_request_header*)buffer;
     char* data = buffer + prms->hlen + sizeof(struct arp_request_header);
-    memcpy(buffer, hrcv, prms->hlen);
 
     hd->htype = stoh16(prms->htype);
     hd->ptype = stoh16(prms->ptype);
@@ -47,7 +57,7 @@ size_t make_reply(struct arp_params* prms, void* prcv, void* hrcv, void* buffer,
     memcpy(data, hrcv,        prms->hlen); data += prms->hlen;
     memcpy(data, prcv,        prms->plen);
 
-    return sizeof(struct arp_request_header) + 3*prms->hlen + 2*prms->plen;
+    return sizeof(struct arp_request_header) + 2 + 3*prms->hlen + 2*prms->plen;
 }
 
 uint16_t peek_ptype(void* buffer, size_t size) {

@@ -12,7 +12,9 @@ enum Id {
     lvl1_new = 42,  /* Big enough not to collide with trivfs msgt_names */
     lvl2_frame,
     lvl3_frame,
-    lvl32_frame, /* Data is a level-2 address and the data itself */
+    lvl32_frame, /* Data is an ethertype
+                    and a level-2 address
+                    and the data itself */
     lvl4_frame,  /* Assume data preceded by a level-3 address */
     upper_frame,
     reserved1,

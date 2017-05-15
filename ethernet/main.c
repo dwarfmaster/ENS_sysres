@@ -17,8 +17,9 @@ struct demuxer_args {
 };
 
 struct lvl32_data {
+    uint16_t ethertype;
     struct mac_address addr;
-    char* data;
+    char data[];
 };
 
 void* demuxer_thread(void* vargs) {
@@ -90,9 +91,14 @@ void* demuxer_thread(void* vargs) {
                 lvl32 = (struct lvl32_data*)buffer;
                 frame.src       = args->dev.mac;
                 frame.dst       = lvl32->addr;
-                frame.ethertype = lookup_type(set);
+                frame.ethertype = lvl32->ethertype;
                 frame.size      = tpinfo.size - sizeof(struct mac_address);
                 frame.data      = lvl32->data;
+
+                if(frame.size < 46) {
+                    memset(frame.data + frame.size, 0, 46 - frame.size);
+                    frame.size = 46;
+                }
 
                 size = 4096;
                 err = make_frame(&frame, buffer, &size);
