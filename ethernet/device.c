@@ -29,7 +29,7 @@ struct file_device_main_data {
 struct device_lvl2_data {
     mach_msg_header_t hd;
     mach_msg_type_t tp;
-    char [];
+    char data[];
 } __attribute__((__packed__));
 
 #define ETH_HEADER_LEN 14

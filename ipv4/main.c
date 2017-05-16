@@ -318,7 +318,7 @@ int main() {
 
     ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &ip_port);
     if(ret != KERN_SUCCESS) {
-        printf("Couldn't allocate input port for IPv4\n");
+        fprintf(stderr, "Couldn't allocate input port for IPv4\n");
         return 1;
     }
 
@@ -327,7 +327,7 @@ int main() {
     // TODO use better arp address
     arp_port = file_name_lookup("./0806", O_READ | O_WRITE, 0);
     if(arp_port == MACH_PORT_NULL) {
-        printf("Couldn't open arp port\n");
+        fprintf(stderr, "Couldn't open arp port\n");
         return 1;
     }
 
@@ -352,7 +352,7 @@ int main() {
     reg->len                          = 4;
     memcpy(reg->data, myip, 4);
 
-    send_data_low(arp_port, sizeof(arp_register_t) + 8, buffer, arp_register);
+    send_data_low(arp_port, sizeof(arp_register_t) + 4, buffer, arp_register);
 
     ports_manage_port_operations_one_thread(fsys->pi.bucket,
             ip_demuxer, 0);
