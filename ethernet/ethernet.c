@@ -94,7 +94,7 @@ static const uint8_t reflect8[256] = {
 
 uint32_t reflect32(uint32_t v) {
     uint32_t ret = 0;
-    for(size_t i = 0; i < 31; ++i) {
+    for(size_t i = 0; i < 32; ++i) {
         if(v & 1) ret |= (1 << (31 - i));
         v = (v >> 1);
     }
@@ -115,7 +115,6 @@ ethernet_error_t compute_crc(const char* buffer, size_t size, uint32_t* crc) {
         *crc = crc_polybytes[data] ^ (*crc << 8);
     }
     *crc = reflect32(*crc) ^ 0xFFFFFFFF;
-    *crc = stoh32(*crc);
     return ETH_SUCCESS;
 }
 
