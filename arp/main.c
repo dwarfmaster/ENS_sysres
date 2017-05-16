@@ -201,22 +201,20 @@ void lvl3_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
         return;
     }
 
-    if(read_pdu(data, size, &handler->params, (void**)&prcv, (void**)&hrcv)) {
+    int r = read_pdu(data, size, &handler->params, (void**)&prcv, (void**)&hrcv);
+    if(r < 0) {
+        return;
+    } else if(r) {
         /* ARP answer */
         tpinfo.id     = arp_answer;
         tpinfo.size   = handler->params.plen + handler->params.hlen;
-        fprintf(stderr, "%hhu.%hhu.%hhu.%hhu -> %02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX",
-                prcv[0], prcv[1], prcv[2], prcv[3],
-                hrcv[0], hrcv[1], hrcv[2],
-                hrcv[3], hrcv[4], hrcv[5]);
 
         memmove(buf, prcv, handler->params.plen);
         memmove(buf + handler->params.plen, hrcv, handler->params.hlen);
         send_data(handler->out, &tpinfo, buf);
     } else {
         /* ARP query */
-        if(memcmp(prcv, handler->addr, handler->addr_len) != 0) return;
-        size          = make_reply(&handler->params, prcv, mac_address, buf, 4096);
+        size          = make_reply(&handler->params, prcv, hrcv, buf, 4096);
         tpinfo.id     = lvl32_frame;
         tpinfo.size   = size;
         send_data(ethernet_port, &tpinfo, buf);
