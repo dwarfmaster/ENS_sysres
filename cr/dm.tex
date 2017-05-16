@@ -178,7 +178,7 @@ qemu} qui contient tout pour tester. Le mot de passe \emph{root} est
 tout et installe les translators.
 
 Cependant, pour pouvoir recevoir des paquets, il faut configurer qemu en tun/tap.
-Sur le remote qithub un script est disponible configurant le PC hôte (il a besoin
+Sur le remote github un script est disponible configurant le PC hôte (il a besoin
 d'une version d'\texttt{ip} récente). Il suffit ensuite de lancer qemu de la façon
 suivante : \texttt{qemu-kvm -m 1G -drive cache=writeback,file=hurd.img -net nic
 -net tap,ifname=tap0,script=no,downscript=no}.
