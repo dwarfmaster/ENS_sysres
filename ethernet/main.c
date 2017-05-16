@@ -92,7 +92,7 @@ void* demuxer_thread(void* vargs) {
                 frame.src       = args->dev.mac;
                 frame.dst       = lvl32->addr;
                 frame.ethertype = lvl32->ethertype;
-                frame.size      = tpinfo.size - sizeof(struct mac_address);
+                frame.size      = tpinfo.size - 2 - sizeof(struct mac_address);
                 frame.data      = lvl32->data;
 
                 if(frame.size < 46) {
@@ -103,7 +103,7 @@ void* demuxer_thread(void* vargs) {
                 size = 4096;
                 err = make_frame(&frame, buffer, &size);
                 if(err != ETH_SUCCESS) {
-                    log_variadic("Couldn't send frame of type %4X\n", frame.ethertype);
+                    log_variadic("Couldn't make frame of type %4X\n", frame.ethertype);
                     continue;
                 }
                 tpinfo.id     = lvl2_frame;
