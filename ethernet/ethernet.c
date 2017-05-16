@@ -159,9 +159,9 @@ ethernet_error_t make_frame(struct eth_frame* frame, char* buffer, size_t* size)
     size_t pack_size = sizeof(struct ethII_header) + 4 + frame->size;
     if(pack_size > *size) return ETH_INVALID;
 
+    memmove(buffer + sizeof(struct ethII_header), frame->data, frame->size);
     for(size_t i = 0; i < 12; ++i) hd->bytes[i] = (i >= 6 ? frame->src.bytes[i-6] : frame->dst.bytes[i]);
     hd->ethertype = stoh16(frame->ethertype);
-    memmove(buffer + sizeof(struct ethII_header), frame->data, frame->size);
     *size = pack_size;
     return compute_crc(buffer, frame->size + sizeof(struct ethII_header), crc);
 }
