@@ -1,0 +1,187 @@
+\documentclass{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[left=3cm, right=3cm, bottom=2cm, top=2cm]{geometry}
+\usepackage{fixltx2e}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\usepackage{qtree}
+\usepackage{tipa}
+\usepackage{indentfirst}
+\usepackage[shortlabels]{enumitem}
+\usepackage{stmaryrd}
+\usepackage{qtree}
+\usepackage{hyperref}
+
+\MakeRobust{\overrightarrow}
+
+\pagestyle{fancy}
+\lhead{Compte rendu}
+\rhead{Luc Chabassier \and Tomas Rigaux}
+
+\newcommand{\vc}[1]{\overrightarrow{#1}}
+\newcommand{\mirrorh}[1]{\raisebox{\depth}{\scalebox{1}[-1]{#1}}}
+\newcommand{\sss}{\subset}
+\renewcommand{\ss}{\subseteq}
+\newcommand{\rsss}{\supset}
+\newcommand{\rss}{\supseteq}
+\newcommand{\lbr}{\llbracket}
+\newcommand{\rbr}{\rrbracket}
+\qtreecenterfalse
+
+\renewcommand{\P}{\mathbb{P}}
+\newcommand{\Pf}{\mathbb{P}_{fin}}
+\newcommand{\rD}{\rightarrow_D}
+\newcommand{\sem}[1]{\lbr #1 \rbr}
+\newcommand{\dsem}[1]{D\sem{#1}}
+\newcommand{\Ec}{\mathcal{E}_{\mathcal{C}}}
+\newcommand{\esem}[1]{\Ec\sem{#1}}
+\newcommand{\rE}{\rightarrow_{\Ec}}
+\renewcommand{\vec}[1]{\overrightarrow{#1}}
+
+\title{TCP/IP pour Hurd}
+\author{Luc Chabassier \and Tomas Rigaux}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+Hurd est un kernel de système d'exploitation, ayant initialement pour ambition
+d'être le noyau du projet GNU. Des difficultés techniques lors de son développement
+ont conduit à son abandon en faveur de Linux. Malgré tout, quelques irréductibles
+développent encore et toujours ce système.
+
+Malgré son abandon, Hurd se base sur des concepts intéressants, inspirés de Plan 9
+et partiellements repris dans Linux avec FUSE. L'idée de base est de déplacer
+le plus possible de services et de driver en user-space. Il suffit donc
+d'avoir un micro-noyau pour faire tourner l'ensemble des services. Celui utilisé
+par Hurd est la réimplémentation par le projet GNU de Mach.
+
+Dans le cas qui nous intéresse, la couche TCP/IP de Hurd actuelle (nommée pfinet,
+qui est un hack sur la TCP/IP de Linux datant d'il y a plusieurs années) est un
+service comme un autre, placé en user space. Notre objectif est de fournir une
+autre implémentation, plus proche de la philosophie de Hurd, c'est à dire non
+monolithique mais découpée en plusieurs services, chacun implémentant un
+protocole.
+
+Rétrospectivement, la partie qui nous a le plus causé problème est la compréhension
+de l'API Mach et de l'écosystème de Hurd, qui souffre d'une absence de documentation
+presque absolue.
+
+\section{Le micronoyau Mach}
+
+Comme tout micronoyau qui se respecte, Mach se concentre sur la gestion des processus
+et leur communication.
+
+Le système d'IPC est centré sur la notion de port : un port est une queue de messages
+typés gérée par le kernel. Les processus ne manipulent pas la queue directement mais
+des droits sur le port. Les droits sur le port sont de \emph{capabilities},
+que les processus peuvent transférer ou utiliser pour recevoir ou envoyer des
+messages sur un port donné.
+
+Se pose alors un problème particulier : comment faire communiquer deux processus
+distincts qui n'ont pas de lien de parenté. L'un doit créer un port et envoyer
+un droit à l'autre. Mais pour envoyer un droit à l'autre processus, il doit
+déjà exister un port permettant de les faire communiquer : la nécessité d'un
+tier initiant la communication est nécessaire. Mach parle d'un serveur de noms.
+C'est ici que Hurd intervient, avec une abstraction classique : le système de
+fichiers. Au lieu d'avoir un système de fichier, chaque fichier est un port implémentant
+un protocole particulier lui permettant de se comporter comme un fichier.
+Chaque processus est lancé avec connaissance de la racine et de son dossier courant,
+et il peut s'en servir pour négotier des ports. Cette idée est très proche de
+ce que faisait plan 9, ou ce qui se passe avec \texttt{/proc} et \texttt{/dev}
+sous Linux.
+
+Un processus qui implémente l'interface de fichier est appelé un translator.
+L'intérêt est qu'il peut notament implémenter d'autres interfaces en même temps.
+Les drivers sont donc des fichiers qui implémentent en plus l'interface \emph{device},
+\emph{pfinet} implémente en plus l'interface \emph{socket} \ldots
+
+\section{Notre projet}
+
+L'objectif est d'implémenter une couche TCP/IP minimaliste sous la forme de
+4 translators :\begin{itemize}
+    \item un translator gérant le protocole \emph{Ethernet}, gérant l'interface
+        avec le \emph{device} gérant ethernet, et répartissant les packets
+        reçus à différents serveurs de niveau supérieur en fonction de leur
+        ethertype.
+    \item un translator gérant le protocole \emph{ARP}, répondant aux requêtes
+        d'ethertype \texttt{0806} et fournissant une interface permettant aux
+        autres translator de faire des requêtes pour obtenir des addresses de
+        niveau 2 correspondant.
+    \item un translator gérant le protocol \emph{IP}, qui à nouveau répartit
+        les frames entrantes en fonction de leur type.
+    \item un translator gérant le protocol \emph{TCP}, implémentant à la fois
+        une interface pour discuter avec le translator \emph{IP} et l'interface
+        \emph{socket} pour offrir une compatibilité avec \texttt{pfinet}.
+\end{itemize}
+
+\section{Ce qui a été fait}
+
+\subsection{Translator ethernet}
+Le translator ethernet se connecte sur un device Mach, et écoute sur son fichier
+des ethertypes en ASCII. Lorsqu'un éthertype est écrit sur son fichier, il suppose
+que c'est un enregistrement d'un \emph{handler} pour cet ethertype. Il va donc
+ouvrir le fichier correspondant (dans un dossier choisit à la compilation, ayant
+pour nom l'ethertype), et y envoyer un message contenant un port de réponse,
+l'adresse MAC et la taille d'une addresse MAC. Puis il y transmet le contenu
+de chaque frame ayant le bon ethertype. De plus, tous les paquets envoyés sur
+le port de réponse son encapsulés dans une frame ethernet avant d'être transmis
+sur le réseau.
+
+Il supporte uniquement les frames Ethernet II et Novell IPX : il ne supporte pas
+les extensions SNAP ou LLC.
+
+\subsection{Translator ARP}
+Le translator ARP implémente l'interface d'un \emph{handler} pour l'éthertype
+\texttt{0x0806}, capable de gérer le protocole ARP dans sa forme la plus générale :
+il peut s'adapter (non testé cependant) à d'autres types d'adresses réseau, et
+supporte simultanément plusieurs types d'adresses ethernet. Plus précisément,
+quand un logiciel veux envoyer des requêtes ARP, il doit s'enregistrer pour
+un ethertype auprès du translator ARP, en lui précisant la taille des adresses
+qu'il manipule, son adresse et un port de réponse. ARP va alors s'occuper tout
+seul de répondre aux requêtes concernant l'ethertype enregistré, et va transférer
+toutes les réponse qu'il reçoit via le port de réponse. De plus, en écrivant
+sur le fichier d'ARP, il est possible de générer ses propres requêtes.
+
+\subsection{Translator IP}
+Le translator IP implémente l'IPv4 et ne supporte pour l'instant que TCP comme
+protocole de niveau supérieure. Il s'occupe de la traduction des addresses IP
+en addresses MAC en négociant avec le translator ARP et cache les résultats.
+
+Il n'est cependant pas encore complètement testé et fonctionnel.
+
+\subsection{Translator TCP}
+Un début d'implémentation de TCP a été fait, mais rien de fonctionnel ni de
+présentable cependant.
+
+\section{Les difficultés}
+Ce projet aurait été très simple si la seule documentation valable d'Hurd dont
+nous disposions n'avait pas été son code source. La majorité du temps passé sur
+ce projet n'a pas été occupé à développer le projet mais à lire le code source
+de Hurd, GNU Mach et un peu la glibc pour Hurd, puis à faire des petits programmes
+de test pour comprendre les APIs dont nous disposions. On peut les trouver sur
+\href{https://github.com/lucas8/ipc-mach}{github}.
+
+\section{Comment tester ?}
+Le code est disponible sur \href{https://github.com/lucas8/ENS_sysres}{github}.
+Cependant il doit être compilé sous Hurd, et installer Hurd est non trivial.
+On a donc fait une \href{https://download.dwarfmaster.net/hurd.img.xz}{image
+qemu} qui contient tout pour tester. Le mot de passe \emph{root} est
+\texttt{root}, et les sources sont disponibles dans les dossier
+\texttt{/home/user}. Un script \texttt{update.sh} y est présent qui recompile
+tout et installe les translators.
+
+Cependant, pour pouvoir recevoir des paquets, il faut configurer qemu en tun/tap.
+Sur le remote qithub un script est disponible configurant le PC hôte (il a besoin
+d'une version d'\texttt{ip} récente). Il suffit ensuite de lancer qemu de la façon
+suivante : \texttt{qemu-kvm -m 1G -drive cache=writeback,file=hurd.img -net nic
+-net tap,ifname=tap0,script=no,downscript=no}.
+
+\end{document}
+
