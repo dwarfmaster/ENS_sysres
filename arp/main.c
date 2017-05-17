@@ -223,8 +223,6 @@ void lvl3_frame_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
 void arp_query_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp                      = outp;
-    mach_port_t ethernet_port = MACH_PORT_NULL; // TODO receive ethernet port
-    if(ethernet_port == MACH_PORT_NULL) return;
 
     char buf[1 << 12];
     typeinfo_t tpinfo;
