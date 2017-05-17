@@ -269,7 +269,7 @@ void lvl3_frame_r(mach_msg_header_t* inp, mach_msg_header_t* outp) {
     /* TODO send to client */
     mach_msg_type_t* tp = (mach_msg_type_t*)(inp + 1);
     char* data = (char*)(tp + 1);
-    for(int i = 0; i < (tp->size / 8) * tp->msgt_number; ++i) {
+    for(int i = 0; i < (tp->msgt_size / 8) * tp->msgt_number; ++i) {
         if(i % 16 == 0) fprintf(stderr, "\n");
         fprintf(stderr, "%02hhX", data[i]);
     }
