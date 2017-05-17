@@ -296,10 +296,10 @@ static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
             break;
 
         case timer_msg:
-            msg = (timer_message_t*)inp
+            msg = (timer_message_t*)(((char*)inp)
                 + sizeof(mach_msg_header_t)
-                + sizeof(mach_msg_type_t);
-            ip = *(uint32_t*)msg->data;
+                + sizeof(mach_msg_type_t));
+            ip = msg->data;
             make_request(arp_port, (char*)(&ip));
             if(lookup(ip)->waiting == 1) add_timer(timer_port, 60*1000, 0, ip);
             break;
