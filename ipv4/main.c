@@ -41,7 +41,7 @@ struct mac_value {
 };
 
 static struct mac_value* cache[1 << 16];
-mach_port_t ip_port, arp_port, timer_port;
+mach_port_t ip_port, arp_port, timer_port, ethernet_port;
 char myip[4];
 
 static inline uint16_t hash(uint32_t ip) {
@@ -53,7 +53,7 @@ void send_request(struct requests* req, struct mac_address ma) {
     tpinfo.id = lvl32_frame;
     tpinfo.size = req->size;
     memcpy(req->buffer, &ma, sizeof(struct mac_address));
-    send_data(arp_port, &tpinfo, (char*)req->buffer);
+    send_data(ethernet_port, &tpinfo, (char*)req->buffer);
     if(req->next != NULL) send_request(req->next, ma);
     free(req);
 }
@@ -259,6 +259,21 @@ void refresh_ip_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     mv->waiting = 0;
 }
 
+void lvl1_new_r(mach_msg_header_t* inp, mach_msg_header_t* outp) {
+    lvl1_new_t* lvl1 = (lvl1_new_t*)(inp + 1);
+    ethernet_port = lvl1->port;
+}
+
+void lvl3_frame_r(mach_msg_header_t* inp, mach_msg_header_t* outp) {
+    /* TODO send to client */
+    mach_msg_type_t* tp = (mach_msg_type_t*)(inp + 1);
+    char* data = (char*)(tp + 1);
+    for(int i = 0; i < (tp->size / 8) * tp->number; ++i) {
+        if(i % 16 == 0) frpintf(stderr, "\n");
+        fprintf(stderr, "%02hhX", data[i]);
+    }
+}
+
 static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     routine_t routine   = NULL;
     timer_message_t* msg;
@@ -267,6 +282,14 @@ static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     log_variadic("ipv4 received : %d\n", inp->msgh_id);
 
     switch(inp->msgh_id) {
+        case lvl1_new:
+            routine = lvl1_new_r;
+            break;
+
+        case lvl3_frame:
+            routine = lvl3_frame_r;
+            break;
+
         case lvl4_frame:
             routine = send_to_r;
             break;
