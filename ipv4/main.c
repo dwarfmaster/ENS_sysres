@@ -340,9 +340,9 @@ int main() {
         return 1; // IO
     }
 
-    ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &ip_port);
-    if(ret != KERN_SUCCESS) {
-        fprintf(stderr, "Couldn't allocate input port for IPv4\n");
+    ip_port = ports_get_send_right(&fsys->pi);
+    if(ip_port == MACH_PORT_NULL) {
+        fprintf(stderr, "Couldn't open ip port\n");
         return 1;
     }
 
