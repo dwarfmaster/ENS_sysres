@@ -4,6 +4,7 @@
 #include <string.h>
 #include <hurd.h>
 #include <hurd/trivfs.h>
+#include <hurd/ports.h>
 #include "ip.h"
 #include "logging.h"
 #include "ports.h"
@@ -173,7 +174,7 @@ typedef void (* routine_t) (mach_msg_header_t *inp, mach_msg_header_t *outp);
 void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp = outp; /* Fix warnings */
     mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
-    char* data          = (char*)tp + sizeof(mach_msg_header_t);
+    char* data          = (char*)tp + sizeof(mach_msg_type_t);
     size_t size         = (tp->msgt_size / 8) * tp->msgt_number;
     if(size > MAX_SIZE) {
         log_variadic("ip packet size is too big : %u\n", size);
