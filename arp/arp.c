@@ -82,7 +82,7 @@ int read_pdu(void* buffer, size_t size, struct arp_params* prms, void** prcv, vo
     assert(prms->ptype == htos16(hd->ptype));
 
     *hrcv = data;
-    if(htos16(hd->oper) == 2) {
+    if(htos16(hd->oper) == 1) {
         *prcv = data + 2 * prms->hlen + prms->plen;
         if(memcmp(*prcv, prms->paddr, prms->plen) != 0) return -1;
     }
