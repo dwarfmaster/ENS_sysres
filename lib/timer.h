@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <hurd.h>
+#include "proto.h"
 
 typedef mach_port_t tcp_timer_t;
 

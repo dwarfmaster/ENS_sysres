@@ -109,7 +109,7 @@ void* timer_thread_main(void* data) {
         if(!empty(heap)) {
             uint32_t time = get_time();
             /* If it should already have been sent, do it now */
-            if(heap[1].end_time < time) goto send_timeout;
+            if(heap[1].end_time <= time) goto send_timeout;
             timeout = heap[1].end_time - time;
             option |= MACH_RCV_TIMEOUT;
         }
@@ -131,7 +131,7 @@ void* timer_thread_main(void* data) {
 
 send_timeout:
         do {
-            tpinfo.id     = 0;
+            tpinfo.id     = timer_msg;
             tpinfo.size   = sizeof(timer_message_t);
             out->port = heap[1].port;
             out->data = heap[1].data;
