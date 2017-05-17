@@ -109,7 +109,7 @@ int main() {
     ping_ip[0] = 192;
     ping_ip[1] = 168;
     ping_ip[2] = 42;
-    ping_ip[3] = 79;
+    ping_ip[3] = 143;
 
     task_get_bootstrap_port(mach_task_self(), &bootstrap);
     if(bootstrap == MACH_PORT_NULL) {
@@ -122,12 +122,6 @@ int main() {
         log_string("Couldn't setup translator");
         return 1; // IO
     }
-
-    //ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &ip_port);
-    //if(ret != KERN_SUCCESS) {
-    //    fprintf(stderr, "Couldn't allocate input port for icmp tester\n");
-    //    return 1;
-    //}
 
     ip_port = file_name_lookup("./0800", O_READ | O_WRITE, 0);
     if(ip_port == MACH_PORT_NULL) {
@@ -151,7 +145,7 @@ int main() {
     buffer[10] = 0x42; // header data 3 sequence number 1
     buffer[11] = 0x42; // header data 4 sequence number 2
 
-    send_data(ip_port, &tpinfo, buffer);
+    int errsd = send_data(ip_port, &tpinfo, buffer);
     return 0; // SUCCESS
 }
 
