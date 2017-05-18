@@ -19,6 +19,7 @@
 #define IHL     5
 #define DSCP    0 // ???
 #define ECN     0 // ???
+#define ICMP    0x01
 #define TCP     0x06
 #define TIMEOUT 900
 
@@ -196,19 +197,20 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     et[0] = 0x00;
     et[1] = 0x08;
 
-    ih = (struct ip_header*)req->buffer + 2 + sizeof(struct mac_address);
+    ih = (struct ip_header*)(req->buffer + 2 + sizeof(struct mac_address));
     ih->hd             = build_hd(VERSION, IHL);
     ih->dscp_ecn       = build_dscp_ecn(DSCP, ECN);
-    ih->length         = sizeof(struct ip_header) + size;
+    ih->length         = (sizeof(struct ip_header) + size - 4) << 8; // TODO fix for little endian
     ih->identification = time % (1 << 16); // identify packet
     ih->fragments      = build_fragments(0, 0, 0); // We shouldn't have to fragmentize ourselves
     ih->ttl            = 64;
-    ih->protocol       = TCP; // TODO generalize
-    ih->src            = 0; // TODO find source ip
+    ih->protocol       = ICMP; // TODO generalize
+    //ih->protocol       = TCP; // TODO generalize
+    ih->src            = *((uint32_t*)myip); // TODO choose an unused ip at start
     ih->dst            = ip;
     compute_checksum(ih);
 
-    memcpy(ih + sizeof(struct ip_header), data, size);
+    memcpy(((char*)ih) + sizeof(struct ip_header), data, size);
 
     struct mac_value* mv = lookup(ip);
     if(mv == NULL) {
