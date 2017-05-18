@@ -138,8 +138,8 @@ int main() {
     buffer[3]  = ping_ip[3]; // ip to ping 4
     buffer[4]  = 0x08; // Type
     buffer[5]  = 0x00; // Code
-    buffer[6]  = 0x8C; // checksum 1 = 8C84
-    buffer[7]  = 0x84; // checksum 2
+    buffer[6]  = 0x73; // checksum 1 = 8C84
+    buffer[7]  = 0x7b; // checksum 2
     buffer[8]  = 0x42; // header data 1 identifier 1
     buffer[9]  = 0x42; // header data 2 identifier 2
     buffer[10] = 0x42; // header data 3 sequence number 1
