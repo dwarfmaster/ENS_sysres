@@ -53,7 +53,7 @@ void send_request(struct requests* req, struct mac_address ma) {
     struct typeinfo tpinfo;
     tpinfo.id = lvl32_frame;
     tpinfo.size = req->size;
-    memcpy(req->buffer, &ma, sizeof(struct mac_address));
+    memcpy(req->buffer + 2, &ma, sizeof(struct mac_address));
     send_data(ethernet_port, &tpinfo, (char*)req->buffer);
     if(req->next != NULL) send_request(req->next, ma);
     free(req);
@@ -262,6 +262,7 @@ void refresh_ip_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 
 void lvl1_new_r(mach_msg_header_t* inp, mach_msg_header_t* outp) {
     lvl1_new_t* lvl1 = (lvl1_new_t*)(inp + 1);
+    mach_port_insert_right(mach_task_self(), lvl1->port, lvl1->port, MACH_MSG_TYPE_COPY_SEND);
     ethernet_port = lvl1->port;
 }
 
