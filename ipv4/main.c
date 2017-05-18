@@ -21,7 +21,7 @@
 #define ECN     0 // ???
 #define ICMP    0x01
 #define TCP     0x06
-#define TIMEOUT 900
+#define TIMEOUT 900 * 1000
 
 struct mac_address {
     uint8_t b0, b1, b2, b3, b4, b5;
@@ -237,7 +237,7 @@ void send_to_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
 void refresh_ip_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     outp = outp; /* Fix warnings */
     mach_msg_type_t* tp = (mach_msg_type_t*)((char*)inp + sizeof(mach_msg_header_t));
-    char* data          = (char*)tp + sizeof(mach_msg_header_t);
+    char* data          = (char*)tp + sizeof(mach_msg_type_t);
     size_t size         = (tp->msgt_size / 8) * tp->msgt_number;
     if(size != sizeof(uint32_t) + sizeof(struct mac_address)) {
         log_variadic("IP received arp answer of invalid length : %u\n", size);
@@ -245,7 +245,7 @@ void refresh_ip_r(mach_msg_header_t *inp, mach_msg_header_t *outp) {
     }
 
     uint32_t ip           = *((uint32_t*)data);
-    struct mac_address ma = *((struct mac_address*)data + sizeof(uint32_t));
+    struct mac_address ma = *((struct mac_address*)(data + sizeof(uint32_t)));
 
     struct mac_value* mv = lookup(ip);
     if(mv == NULL || mv->waiting == 0) {
@@ -303,8 +303,10 @@ static int ip_demuxer(mach_msg_header_t *inp, mach_msg_header_t *outp) {
                 + sizeof(mach_msg_header_t)
                 + sizeof(mach_msg_type_t));
             ip = msg->data;
-            make_request(arp_port, (char*)(&ip));
-            if(lookup(ip)->waiting == 1) add_timer(timer_port, 60*1000, 0, ip);
+            if(lookup(ip)->waiting == 1) {
+                make_request(arp_port, (char*)(&ip));
+                add_timer(timer_port, 1000, 0, ip);
+            }
             break;
 
         case arp_answer:
